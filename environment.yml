@@ -1,0 +1,6 @@
+name: firmdynamic-abm
+channels:
+  - defaults
+dependencies:
+  - python=3.9
+prefix: C:\Users\41782\anaconda3\envs\firmdynamic-abm
