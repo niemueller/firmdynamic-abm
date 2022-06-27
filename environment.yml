@@ -1,6 +1,9 @@
-name: firmdynamic-abm
+name: abm-env
 channels:
+  - conda-forge
   - defaults
 dependencies:
   - python=3.9
-prefix: C:\Users\41782\anaconda3\envs\firmdynamic-abm
+  - pip
+  - pip:
+      - mesa==0.9.0
