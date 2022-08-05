@@ -10,7 +10,11 @@ def firm_output(a, b, beta, total_effort):
     return a*total_effort + b*total_effort**beta
 
 
-def utility(effort, p):
+def utility(effort, a, b, beta, theta, wealth, effort_others, number_employees):
+    return -(((a*(effort + effort_others) + b*(effort + effort_others)**beta)/number_employees)**theta*(wealth - effort)**(1-theta))
+
+
+def utility_2(effort, p):
     a = p[0]
     b = p[1]
     beta = p[2]
@@ -18,7 +22,7 @@ def utility(effort, p):
     wealth = p[4]
     effort_others = p[5]
     number_employees = p[6]
-    return -((a*(effort + effort_others) + b*(effort + effort_others)**beta)/number_employees)**theta*(wealth - effort)**(1-theta)
+    return -(((a*(effort + effort_others) + b*(effort + effort_others)**beta)/number_employees)**theta*(wealth - effort)**(1-theta))
 
 
 class Worker(Agent):
@@ -37,8 +41,8 @@ class Worker(Agent):
         self.effort = 0
         print(self.endowment, self.preference, self.currentFirm)
 
-    def optimization_effort(self, function):
-        return opt.minimize_scalar(-function, [0, self.endowment])
+    def optimization_effort(self, function, params):
+        return opt.minimize_scalar(-function, args=params, bounds=[0, self.endowment])
 
     def get_fixed_param_tuple(self):
         current_firm = self.currentFirm
@@ -49,12 +53,13 @@ class Worker(Agent):
         wealth = self.endowment
         effort_others = current_firm.total_effort - self.effort
         number_employees = len(current_firm.employeeList)
-        fixed_param = (a, b, beta, theta, wealth, effort_others, number_employees)
-        return fixed_param
+        param_tuple = (a, b, beta, theta, wealth, effort_others, number_employees)
+        return param_tuple
 
-    def scipy_utility(self, x):
-        param_tuple = self.get_fixed_param_tuple(x)
-        return ((param_tuple[0]*(x + param_tuple[5]) + param_tuple[1]*(x + param_tuple[5])**param_tuple[2])/param_tuple[6])**param_tuple[3]*(param_tuple[4] - x)**(1-param_tuple[4])
+    def utility_max_object(self):
+        params = self.get_fixed_param_tuple()
+        optimization_output = opt.minimize_scalar(utility, args=params, method="bounded", bounds=[0, self.endowment])
+        return optimization_output
 
     def step(self):
         # The agent's step will go here
@@ -62,14 +67,6 @@ class Worker(Agent):
         print("Hi, I am agent " + str(self.unique_id) + ".")
         neigh = self.model.grid.get_neighbors(self.pos)
         print(neigh)
-        x = self.get_fixed_param_tuple()
-        print(x)
-
-        # get optimal effort in current firm (e*)
-        # params = self.get_fixed_param_tuple()
-        # print(lambda effort: utility)(effort, params)
-        # optimization_output = opt.minimize_scalar(self.get_fixed_param_tuple(x), [0, self.endowment])
-        print(self.get_fixed_param_tuple())
 
 
 class Firm(Agent):
