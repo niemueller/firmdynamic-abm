@@ -4,6 +4,7 @@ import networkx as nx
 from mesa import Agent, Model
 from mesa.time import RandomActivationByType
 from mesa.space import NetworkGrid
+import pandas as pd
 
 
 def firm_output(a, b, beta, total_effort):
@@ -41,11 +42,7 @@ class Worker(Agent):
         self.effort = 0
         print(self.endowment, self.preference, self.currentFirm)
 
-    def optimization_effort(self, function, params):
-        return opt.minimize_scalar(-function, args=params, bounds=[0, self.endowment])
-
-    def get_fixed_param_tuple(self):
-        current_firm = self.currentFirm
+    def get_fixed_param_tuple(self, current_firm):
         a = current_firm.constantReturnCoef
         b = current_firm.increasingReturnCoef
         beta = current_firm.increasingReturnExp
@@ -56,10 +53,45 @@ class Worker(Agent):
         param_tuple = (a, b, beta, theta, wealth, effort_others, number_employees)
         return param_tuple
 
-    def utility_max_object(self):
-        params = self.get_fixed_param_tuple()
+    def utility_max_object(self, current_firm):
+        params = self.get_fixed_param_tuple(current_firm)
         optimization_output = opt.minimize_scalar(utility, args=params, method="bounded", bounds=[0, self.endowment])
         return optimization_output
+
+    def effort_star(self, optimization_output):
+        return optimization_output.x
+
+    def utility_star(self, optimization_output):
+        return -optimization_output.fun
+
+    def get_neighbors(self):
+        return self.model.grid.get_neighbors(self.pos, include_center=True)
+
+    def get_firms_in_network(self):
+        firm_network = []
+        neighbor_nodes = self.get_neighbors()
+        for agent in self.model.grid.get_cell_list_contents(neighbor_nodes):
+            firm_network.append(agent.currentFirm)
+        return firm_network
+
+    def optimization_over_firms_in_network(self):
+        firm_list = []
+        effort_list = []
+        utility_list = []
+        for firm in self.get_firms_in_network():
+            firm_list.append(firm)
+            utility_object = self.utility_max_object(firm)
+            effort_list.append(self.effort_star(utility_object))
+            utility_list.append(self.utility_star(utility_object))
+        optimization_df = pd.DataFrame()
+        optimization_df["firm"] = firm_list
+        optimization_df["effort"] = effort_list
+        optimization_df["utility"] = utility_list
+        return optimization_df
+
+    def optimal_values(self):
+        df = self.optimization_over_firms_in_network()
+        return df.iloc[[df["utility"].idxmax()]]
 
     def step(self):
         # The agent's step will go here
@@ -67,6 +99,22 @@ class Worker(Agent):
         print("Hi, I am agent " + str(self.unique_id) + ".")
         neigh = self.model.grid.get_neighbors(self.pos)
         print(neigh)
+        #utility_object = self.utility_max_object()
+        #print(self.effort_star(utility_object))
+        #print(self.utility_star(utility_object))
+        print(self.optimization_over_firms_in_network())
+        print(self.optimal_values())
+        optimal_values = self.optimal_values()
+        optimal_firm = optimal_values["firm"].item()
+        self.effort = optimal_values["effort"].item()
+        print(optimal_firm)
+        print(self.effort)
+        self.endowment -= self.effort
+        if self.currentFirm != optimal_firm:
+            old_firm = self.currentFirm
+            old_firm.employeeList.remove(self)
+            optimal_firm.employeeList.append(self)
+            self.currentFirm = optimal_firm
 
 
 class Firm(Agent):
@@ -95,6 +143,15 @@ class Firm(Agent):
         self.age += 1
         print(self.employeeList)
 
+        if self.employeeList:
+            self.total_effort = self.get_sum_effort()
+            output = firm_output(self.constantReturnCoef, self.increasingReturnCoef, self.increasingReturnExp, self.total_effort)
+            output_share = output/len(self.employeeList)
+            for agent in self.employeeList:
+                agent.endowment += output_share
+        else:
+            self.model.dead_firms.append(self)
+
 
 class BaseModel(Model):
     """A model with N agents connected in a network"""
@@ -108,6 +165,7 @@ class BaseModel(Model):
         self.grid = NetworkGrid(self.G)
         self.schedule = RandomActivationByType(self)
         self.current_id = 0
+        self.dead_firms = ()
 
         # Create agents
         for i in range(self.num_agents):
@@ -122,6 +180,9 @@ class BaseModel(Model):
             # Add agent to a node
             self.grid.place_agent(worker, i)
 
-    def step(self):
+    def step(self,):
         """Advance the model by one step."""
         self.schedule.step()
+        for x in self.dead_firms:
+            self.schedule.remove(x)
+            self.dead_firms.remove(x)
