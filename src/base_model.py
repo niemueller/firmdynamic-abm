@@ -48,6 +48,7 @@ class Worker(Agent):
         beta = current_firm.increasingReturnExp
         theta = self.preference
         wealth = self.endowment
+        current_firm.update_total_effort
         effort_others = current_firm.total_effort - self.effort
         number_employees = len(current_firm.employeeList)
         param_tuple = (a, b, beta, theta, wealth, effort_others, number_employees)
@@ -95,18 +96,12 @@ class Worker(Agent):
 
     def step(self):
         # The agent's step will go here
-        # Test purpose print agent's unique_id
-        print("Hi, I am agent " + str(self.unique_id) + ".")
-        neigh = self.model.grid.get_neighbors(self.pos)
-        print(neigh)
-        #utility_object = self.utility_max_object()
-        #print(self.effort_star(utility_object))
-        #print(self.utility_star(utility_object))
-        print(self.optimization_over_firms_in_network())
-        print(self.optimal_values())
         optimal_values = self.optimal_values()
+        print(optimal_values)
         optimal_firm = optimal_values["firm"].item()
+        print(optimal_firm)
         self.effort = optimal_values["effort"].item()
+        print(self.effort)
         print(optimal_firm)
         print(self.effort)
         self.endowment -= self.effort
@@ -139,6 +134,9 @@ class Firm(Agent):
             sum_effort += agent.effort
         return sum_effort
 
+    def update_total_effort(self):
+        self.total_effort = self.get_sum_effort()
+
     def step(self):
         self.age += 1
         print(self.employeeList)
@@ -165,7 +163,7 @@ class BaseModel(Model):
         self.grid = NetworkGrid(self.G)
         self.schedule = RandomActivationByType(self)
         self.current_id = 0
-        self.dead_firms = ()
+        self.dead_firms = []
 
         # Create agents
         for i in range(self.num_agents):
@@ -180,9 +178,9 @@ class BaseModel(Model):
             # Add agent to a node
             self.grid.place_agent(worker, i)
 
-    def step(self,):
+    def step(self):
         """Advance the model by one step."""
-        self.schedule.step()
+        self.schedule.step(shuffle_types= False)
         for x in self.dead_firms:
             self.schedule.remove(x)
             self.dead_firms.remove(x)
