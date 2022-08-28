@@ -90,6 +90,20 @@ class Worker(Agent):
         optimization_df["utility"] = utility_list
         return optimization_df
 
+    def create_startup(self):
+        startup = Firm(self.model.next_id(), self.model)
+        startup.employeeList.append(self)
+        return startup
+
+    def startup_maximization(self, startup):
+        startup_df = pd.DataFrame()
+        startup = startup
+        startup_utility_object = self.utility_max_object(startup)
+        startup_effort = self.effort_star(startup_utility_object)
+        startup_utility = self.utility_star(startup_utility_object)
+        startup_df = {"firm": startup, "effort": startup_effort, "utility": startup_utility}
+        return startup_df
+
     def optimal_values(self):
         df = self.optimization_over_firms_in_network()
         return df.iloc[[df["utility"].idxmax()]]
@@ -98,18 +112,33 @@ class Worker(Agent):
         # The agent's step will go here
         optimal_values = self.optimal_values()
         print(optimal_values)
-        optimal_firm = optimal_values["firm"].item()
-        print(optimal_firm)
-        self.effort = optimal_values["effort"].item()
-        print(self.effort)
-        print(optimal_firm)
-        print(self.effort)
-        self.endowment -= self.effort
-        if self.currentFirm != optimal_firm:
+        # Join existing firm or start new firm
+        startup = self.create_startup()
+        startup_df = self.startup_maximization(startup)
+        existing_utility = optimal_values["utility"]
+        startup_utility = startup_df["utility"]
+        if optimal_values["utility"].item() >= startup_utility:
+            self.model.current_id -= 1
+            optimal_firm = optimal_values["firm"].item()
+            print(optimal_firm)
+            self.effort = optimal_values["effort"].item()
+            print(self.effort)
+            print(optimal_firm)
+            print(self.effort)
+            self.endowment -= self.effort
+            if self.currentFirm != optimal_firm:
+                old_firm = self.currentFirm
+                old_firm.employeeList.remove(self)
+                optimal_firm.employeeList.append(self)
+                self.currentFirm = optimal_firm
+        else:
+            optimal_firm = startup_df["firm"]
+            self.effort = startup_df["effort"]
+            self.endowment -= self.effort
             old_firm = self.currentFirm
             old_firm.employeeList.remove(self)
-            optimal_firm.employeeList.append(self)
             self.currentFirm = optimal_firm
+            self.model.schedule.add(optimal_firm)
 
 
 class Firm(Agent):
@@ -180,7 +209,7 @@ class BaseModel(Model):
 
     def step(self):
         """Advance the model by one step."""
-        self.schedule.step(shuffle_types= False)
+        self.schedule.step(shuffle_types=False)
         for x in self.dead_firms:
             self.schedule.remove(x)
             self.dead_firms.remove(x)
