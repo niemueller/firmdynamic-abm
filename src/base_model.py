@@ -90,7 +90,9 @@ class Worker(Agent):
         neighbor_nodes = self.get_neighbors()
         for agent in self.model.grid.get_cell_list_contents(neighbor_nodes):
             firm_network.append(agent.currentFirm)
-        return firm_network
+        res = []
+        [res.append(x) for x in firm_network if x not in res]
+        return res
 
     def optimization_over_firms_in_network(self):
         firm_list = []
@@ -99,8 +101,21 @@ class Worker(Agent):
         for firm in self.get_firms_in_network():
             firm_list.append(firm)
             utility_object = self.utility_max_object(firm)
-            effort_list.append(self.effort_star(utility_object))
-            utility_list.append(self.utility_star(utility_object))
+            effort_calc = self.effort_star(utility_object)
+            params = self.get_fixed_param_tuple(firm)
+            utility_star = -utility(effort_calc, params[0], params[1], params[2], params[3], params[4], params[5], params[6])
+            utility_zero = -utility(0, params[0], params[1], params[2], params[3], params[4], params[5], params[6])
+            utility_effort_equal_wealth = -utility(self.endowment, params[0], params[1], params[2], params[3], params[4], params[5], params[6])
+            utility_tuple = (utility_star, utility_zero, utility_effort_equal_wealth)
+            max_utility = max(utility_tuple)
+            if max_utility == utility_star:
+                effort_list.append(effort_calc)
+            elif max_utility == utility_zero:
+                effort_list.append(0)
+            else:
+                effort_list.append(self.endowment)
+
+            utility_list.append(max_utility)
         optimization_df = pd.DataFrame()
         optimization_df["firm"] = firm_list
         optimization_df["effort"] = effort_list
