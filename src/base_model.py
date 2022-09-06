@@ -7,6 +7,9 @@ from mesa.space import NetworkGrid
 from mesa.datacollection import DataCollector
 import pandas as pd
 import math
+import sys
+# would be useful for defining intervals (open intervals) (intervals renamed to portion but could not install)
+# import portion as P not used, delete package
 
 
 def firm_output(a, b, beta, total_effort):
@@ -34,6 +37,9 @@ class Worker(Agent):
         super().__init__(unique_id, model)
         self.endowment = 1
         self.preference = random.uniform(0, 1)
+        # create open-open interval (random.uniform is [,))
+        while self.preference == 0.0:
+            self.preference = random.uniform(0, 1)
         # production function OUTPUT = a*(Sum of Efforts) + b(Sum of Efforts)^beta
         # Add current firm variable
         self.currentFirm = None
@@ -73,8 +79,23 @@ class Worker(Agent):
 
     def utility_max_object(self, current_firm):
         params = self.get_fixed_param_tuple(current_firm)
-        optimization_output = opt.minimize_scalar(log_utility, args=params, method="bounded", bounds=[0, self.endowment])
-        return optimization_output
+        if current_firm.get_employee_count() == 1:
+            # open interval as logUtility not defined on e = 0 and e = w
+            bnds = [0+sys.float_info.epsilon, self.endowment-sys.float_info.epsilon]
+        # closed-open interval as logUtility not defined e = w
+        elif current_firm.get_employee_count() > 1:
+            bnds = [0, self.endowment-sys.float_info.epsilon]
+        else:
+            print("Current firm has no employee")
+            sys.exit()
+
+        optimization_output = opt.minimize_scalar(log_utility, args=params, method="bounded", bounds=bnds)
+
+        if not optimization_output.success:
+            print("Optimization not successful")
+            sys.exit()
+        else:
+            return optimization_output
 
     def effort_star(self, optimization_output):
         return optimization_output.x
@@ -101,21 +122,11 @@ class Worker(Agent):
         for firm in self.get_firms_in_network():
             firm_list.append(firm)
             utility_object = self.utility_max_object(firm)
-            effort_calc = self.effort_star(utility_object)
-            params = self.get_fixed_param_tuple(firm)
-            utility_star = -utility(effort_calc, params[0], params[1], params[2], params[3], params[4], params[5], params[6])
-            utility_zero = -utility(0, params[0], params[1], params[2], params[3], params[4], params[5], params[6])
-            utility_effort_equal_wealth = -utility(self.endowment, params[0], params[1], params[2], params[3], params[4], params[5], params[6])
-            utility_tuple = (utility_star, utility_zero, utility_effort_equal_wealth)
-            max_utility = max(utility_tuple)
-            if max_utility == utility_star:
-                effort_list.append(effort_calc)
-            elif max_utility == utility_zero:
-                effort_list.append(0)
-            else:
-                effort_list.append(self.endowment)
+            util = self.utility_star(utility_object)
+            effort = self.effort_star(utility_object)
+            utility_list.append(util)
+            effort_list.append(effort)
 
-            utility_list.append(max_utility)
         optimization_df = pd.DataFrame()
         optimization_df["firm"] = firm_list
         optimization_df["effort"] = effort_list
@@ -129,9 +140,10 @@ class Worker(Agent):
 
     def startup_maximization(self, startup):
         startup = startup
-        startup_utility_object = self.utility_max_object(startup)
-        startup_effort = self.effort_star(startup_utility_object)
-        startup_utility = self.utility_star(startup_utility_object)
+        params = self.get_fixed_param_tuple(startup)
+        utility_object = self.utility_max_object(startup)
+        startup_effort = self.effort_star(utility_object)
+        startup_utility = self.utility_star(utility_object)
         startup_df = {"firm": startup, "effort": startup_effort, "utility": startup_utility}
         return startup_df
 
@@ -144,7 +156,10 @@ class Worker(Agent):
         print(self.optimization_over_firms_in_network())
         optimal_values = self.optimal_values()
 
-        print(optimal_values)
+        if optimal_values["effort"].item() >= self.endowment:
+            print("Effort bigger than endowment")
+            sys.exit()
+
         # Join existing firm or start new firm
         startup = self.create_startup()
         startup_df = self.startup_maximization(startup)
@@ -206,6 +221,9 @@ class Firm(Agent):
 
     def update_total_effort(self):
         self.total_effort = self.get_sum_effort()
+
+    def get_employee_count(self):
+        return len(self.employeeList)
 
     def step(self):
         self.age += 1
