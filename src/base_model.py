@@ -8,23 +8,26 @@ from mesa.datacollection import DataCollector
 import pandas as pd
 import math
 import sys
+from operator import itemgetter
+
+
 # would be useful for defining intervals (open intervals) (intervals renamed to portion but could not install)
 # import portion as P not used, delete package
 
 
 def firm_output(a, b, beta, total_effort):
-    return a * total_effort + b * total_effort ** beta
+    return (a * total_effort + b * total_effort ** beta)
 
 
 def utility(effort, a, b, beta, theta, wealth, effort_others, number_employees):
     return (-(((a * (effort + effort_others) + b * (effort + effort_others) ** beta) / number_employees) ** theta * (
-                wealth - effort) ** (1 - theta)))
+            wealth - effort) ** (1 - theta)))
 
 
 def log_utility(effort, a, b, beta, theta, wealth, effort_others, number_employees):
-    return (-(theta*math.log10(a*(effort+effort_others)+b*(effort+effort_others)**beta)
-            - theta*math.log10(number_employees)
-            + (1-theta)*math.log10(wealth-effort)))
+    return -(theta * math.log10(
+        (a * (effort + effort_others) + b * (effort + effort_others) ** beta) / number_employees) + (
+                      1 - theta) * math.log10(wealth - effort))
 
 
 class Worker(Agent):
@@ -40,10 +43,14 @@ class Worker(Agent):
         # create open-open interval (random.uniform is [,))
         while self.preference == 0.0:
             self.preference = random.uniform(0, 1)
-        # production function OUTPUT = a*(Sum of Efforts) + b(Sum of Efforts)^beta
         # Add current firm variable
         self.currentFirm = None
+        self.newFirm = None
         self.effort = 0
+        self.job_event = None
+        self.active = False
+        self.wealth = 0
+        self.income = None
 
     @property
     def endowment(self):
@@ -65,32 +72,67 @@ class Worker(Agent):
             raise ValueError("Effort cannot be negative")
         self._effort = value
 
-    def get_fixed_param_tuple(self, current_firm):
+    def get_effort_others_current_firm(self) -> float:
+        firm = self.currentFirm
+        effort_others = firm.total_effort - self.effort
+        return effort_others
+
+    def get_employee_count_plusone(self) -> int:
+        firm = self.currentFirm
+        employee_plus_one = firm.get_employee_count() + 1
+        return employee_plus_one
+
+    def get_fixed_param_tuple_current(self) -> tuple:
+        current_firm = self.currentFirm
         a = current_firm.constantReturnCoef
         b = current_firm.increasingReturnCoef
         beta = current_firm.increasingReturnExp
         theta = self.preference
         wealth = self.endowment
-        current_firm.update_total_effort()
-        effort_others = current_firm.total_effort - self.effort
-        number_employees = len(current_firm.employeeList)
+        effort_others = self.get_effort_others_current_firm()
+        number_employees = current_firm.get_employee_count()
+        if effort_others < 0:
+            print("Effort others negative")
+            sys.exit()
         param_tuple = (a, b, beta, theta, wealth, effort_others, number_employees)
         return param_tuple
 
-    def utility_max_object(self, current_firm):
-        params = self.get_fixed_param_tuple(current_firm)
-        if current_firm.get_employee_count() == 1:
-            # open interval as logUtility not defined on e = 0 and e = w
-            bnds = [0+sys.float_info.epsilon, self.endowment-sys.float_info.epsilon]
-        # closed-open interval as logUtility not defined e = w
-        elif current_firm.get_employee_count() > 1:
-            bnds = [0, self.endowment-sys.float_info.epsilon]
-        else:
-            print("Current firm has no employee")
+    def get_fixed_param_tuple_other(self, firm) -> tuple:
+        a = firm.constantReturnCoef
+        b = firm.increasingReturnCoef
+        beta = firm.increasingReturnExp
+        theta = self.preference
+        wealth = self.endowment
+        effort_others = firm.total_effort
+        number_employees = self.get_employee_count_plusone()
+        if effort_others < 0:
+            print("Effort others negative")
             sys.exit()
+        param_tuple = (a, b, beta, theta, wealth, effort_others, number_employees)
+        return param_tuple
+
+    def get_fixed_param_tuple_startup(self, current_firm):
+        a = current_firm.constantReturnCoef
+        b = current_firm.increasingReturnCoef
+        beta = current_firm.increasingReturnExp
+        theta = self.preference
+        wealth = self.endowment
+        effort_others = 0
+        number_employees = 1
+        param_tuple = (a, b, beta, theta, wealth, effort_others, number_employees)
+        return param_tuple
+
+    def utility_max_object(self, params: tuple):
+        effort_others = params[5]
+        wealth = params[4]
+        epsilon = sys.float_info.epsilon
+        # if all others
+        if effort_others == 0:
+            bnds = (epsilon, wealth - epsilon)
+        else:
+            bnds = (0, wealth - epsilon)
 
         optimization_output = opt.minimize_scalar(log_utility, args=params, method="bounded", bounds=bnds)
-
         if not optimization_output.success:
             print("Optimization not successful")
             sys.exit()
@@ -101,90 +143,115 @@ class Worker(Agent):
         return optimization_output.x
 
     def utility_star(self, optimization_output):
-        return (-optimization_output.fun)
+        return -optimization_output.fun
 
     def get_neighbors(self):
-        return self.model.grid.get_neighbors(self.pos, include_center=True)
+        return self.model.grid.get_neighbors(self.pos, include_center=False)
 
-    def get_firms_in_network(self):
+    def get_firms_in_network(self) -> list:
+        # does not include current firm
         firm_network = []
         neighbor_nodes = self.get_neighbors()
         for agent in self.model.grid.get_cell_list_contents(neighbor_nodes):
-            firm_network.append(agent.currentFirm)
+            if agent.currentFirm != self.currentFirm:
+                firm_network.append(agent.currentFirm)
         res = []
         [res.append(x) for x in firm_network if x not in res]
         return res
 
-    def optimization_over_firms_in_network(self):
-        firm_list = []
-        effort_list = []
-        utility_list = []
-        for firm in self.get_firms_in_network():
-            firm_list.append(firm)
-            utility_object = self.utility_max_object(firm)
-            util = self.utility_star(utility_object)
-            effort = self.effort_star(utility_object)
-            utility_list.append(util)
-            effort_list.append(effort)
+    def network_firm_maximization(self, firm_object):
+        params = self.get_fixed_param_tuple_other(firm_object)
+        utility_object = self.utility_max_object(params)
+        max_utility = self.utility_star(utility_object)
+        max_effort = self.effort_star(utility_object)
+        # return tuple (len4)
+        return firm_object, "join_other", max_effort, max_utility
 
-        optimization_df = pd.DataFrame()
-        optimization_df["firm"] = firm_list
-        optimization_df["effort"] = effort_list
-        optimization_df["utility"] = utility_list
-        return optimization_df
+    def maximization_over_network_firms(self, firm_list):
+        if not firm_list:
+            print("No other firms found in agents network")
+            return False
+        else:
+            list_max_tuples = []
+            for firm in firm_list:
+                list_max_tuples.append(self.network_firm_maximization(firm))
+            return list_max_tuples
+
+    def current_firm_maximization(self):
+        firm_object = self.currentFirm
+        params = self.get_fixed_param_tuple_current()
+        utility_object = self.utility_max_object(params)
+        max_effort = self.effort_star(utility_object)
+        max_utility = self.utility_star(utility_object)
+        # return tuple (len4)
+        return firm_object, "stay", max_effort, max_utility
 
     def create_startup(self):
         startup = Firm(self.model.next_id(), self.model)
-        startup.employeeList.append(self)
         return startup
 
-    def startup_maximization(self, startup):
-        startup = startup
-        params = self.get_fixed_param_tuple(startup)
-        utility_object = self.utility_max_object(startup)
+    def startup_maximization(self):
+        startup = self.create_startup()
+        params = self.get_fixed_param_tuple_startup(startup)
+        utility_object = self.utility_max_object(params)
         startup_effort = self.effort_star(utility_object)
         startup_utility = self.utility_star(utility_object)
-        startup_df = {"firm": startup, "effort": startup_effort, "utility": startup_utility}
-        return startup_df
+        # return tuple (len4)
+        return startup, "startup", startup_effort, startup_utility
 
-    def optimal_values(self):
-        df = self.optimization_over_firms_in_network()
-        return df.iloc[[df["utility"].idxmax()]]
+    def get_total_max_list(self):
+        join_other_max_list = self.maximization_over_network_firms(self.get_firms_in_network())
+        startup_max_tuple = self.startup_maximization()
+        current_max_tuple = self.current_firm_maximization()
+        # check if join_other_max_list is empty
+        if join_other_max_list:
+            all_max_list = join_other_max_list
+            all_max_list.append(startup_max_tuple)
+            all_max_list.append(current_max_tuple)
+        else:
+            all_max_list = [startup_max_tuple, current_max_tuple]
+        return all_max_list
+
+    def get_max_tuple(self, list_of_tuples) -> tuple:
+        return max(list_of_tuples, key=itemgetter(3))
 
     def step(self):
-        # The agent's step will go here
-        print(self.optimization_over_firms_in_network())
-        optimal_values = self.optimal_values()
 
-        if optimal_values["effort"].item() >= self.endowment:
-            print("Effort bigger than endowment")
-            sys.exit()
+        # activate agent with certain probability (4% of agents are activated each period on average)
+        if random.random() <= 1:
+            self.active = True
+            # The agent's step will go here
+            max_tuple = self.get_max_tuple(self.get_total_max_list())
+            print(max_tuple)
+            self.newFirm = max_tuple[0]
+            self.job_event = max_tuple[1]
+            self.effort = max_tuple[2]
 
-        # Join existing firm or start new firm
-        startup = self.create_startup()
-        startup_df = self.startup_maximization(startup)
-        startup_utility = startup_df["utility"]
-        if optimal_values["utility"].item() >= startup_utility:
-            self.model.current_id -= 1
-            optimal_firm = optimal_values["firm"].item()
-            print(optimal_firm)
-            self.effort = optimal_values["effort"].item()
-            print(self.effort)
-            self.endowment -= self.effort
-            if self.currentFirm != optimal_firm:
-                old_firm = self.currentFirm
-                old_firm.employeeList.remove(self)
-                optimal_firm.employeeList.append(self)
-                self.currentFirm = optimal_firm
+            if self.effort >= self.endowment:
+                print("Effort bigger than endowment")
+                sys.exit()
+
+            # self.endowment -= self.effort
+
+            if self.job_event != "startup":
+                self.model.current_id -= 1
+            elif self.job_event == "startup":
+                self.model.schedule.add(self.newFirm)
+            else:
+                print("There should not be a third option")
+
+            # update Firm Agent
+            self.newFirm.new_employeeList.append(self)
         else:
-            optimal_firm = startup_df["firm"]
-            print(optimal_firm.unique_id)
-            self.effort = startup_df["effort"]
-            self.endowment -= self.effort
-            old_firm = self.currentFirm
-            old_firm.employeeList.remove(self)
-            self.currentFirm = optimal_firm
-            self.model.schedule.add(optimal_firm)
+            self.active = False
+            max_tuple = self.current_firm_maximization()
+            self.newFirm = self.currentFirm
+            self.job_event = "not_active"
+            self.effort = max_tuple[2]
+            self.newFirm.new_employeeList.append(self)
+
+    def advance(self):
+        self.currentFirm = self.newFirm
 
 
 class Firm(Agent):
@@ -195,13 +262,15 @@ class Firm(Agent):
 
         # Random a,b and beta for each firm, todo: rewrite hardcoded part and define them in params script
         self.constantReturnCoef = random.uniform(0, 0.5)
-        self.increasingReturnCoef = random.uniform(3/4, 5/4)
-        self.increasingReturnExp = random.uniform(2, 3/2)
+        self.increasingReturnCoef = random.uniform(3 / 4, 5 / 4)
+        self.increasingReturnExp = random.uniform(3 / 2, 2)
         # Store all employee's in a list
         self.employeeList = []
+        self.new_employeeList = []
         # Attributes needed for statistics
         self.age = 0  # start with 0 or 1?
         self.total_effort = 0
+        self.output = 0
 
     @property
     def total_effort(self):
@@ -213,8 +282,11 @@ class Firm(Agent):
             raise ValueError("Total effort cannot be negative")
         self._total_effort = value
 
+    def get_unique_id(self) -> int:
+        return self.unique_id
+
     def get_sum_effort(self):
-        sum_effort = 0
+        sum_effort = 0.0
         for agent in self.employeeList:
             sum_effort += agent.effort
         return sum_effort
@@ -225,19 +297,34 @@ class Firm(Agent):
     def get_employee_count(self):
         return len(self.employeeList)
 
+    def reset_new_employeeList(self):
+        self.new_employeeList = []
+
     def step(self):
         self.age += 1
+        self.employeeList = self.new_employeeList
         print(self.employeeList)
 
         if self.employeeList:
             self.total_effort = self.get_sum_effort()
-            output = firm_output(self.constantReturnCoef, self.increasingReturnCoef, self.increasingReturnExp,
-                                 self.total_effort)
-            output_share = output / len(self.employeeList)
-            for agent in self.employeeList:
-                agent.endowment += output_share
+            if self.total_effort > 0:
+                output = firm_output(self.constantReturnCoef, self.increasingReturnCoef, self.increasingReturnExp,
+                                     self.total_effort)
+                output_share = output / self.get_employee_count()
+                print(output_share)
+                self.output = output
+                for agent in self.employeeList:
+                    agent.wealth += output_share
+                    agent.income = output_share
+            else:
+                self.output = 0
+                for agent in self.employeeList:
+                    agent.income = 0
         else:
             self.model.dead_firms.append(self)
+
+    def advance(self):
+        self.reset_new_employeeList()
 
 
 class BaseModel(Model):
