@@ -13,6 +13,7 @@ from operator import itemgetter
 
 # would be useful for defining intervals (open intervals) (intervals renamed to portion but could not install)
 # import portion as P not used, delete package
+from src.mesa_ext import SimultaneousActivationByType
 
 
 def firm_output(a, b, beta, total_effort):
@@ -339,7 +340,7 @@ class BaseModel(Model):
         prob = avg_node_degree / self.num_agents
         self.G = nx.erdos_renyi_graph(n=self.num_agents, p=prob)
         self.grid = NetworkGrid(self.G)
-        self.schedule = RandomActivationByType(self)
+        self.schedule = SimultaneousActivationByType(self)
         self.current_id = 0
         self.dead_firms = []
         self.firm_distr = []
