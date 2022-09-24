@@ -1,8 +1,14 @@
+from tqdm import tqdm
+
 import src.base_model
 from src.base_model import BaseModel
 import yaml
 import os
+import logging
+from src.reporter import Reporter
 
+
+logging.basicConfig(level=logging.INFO)
 # folder to load config file
 # CONFIG_PATH = "config/"
 
@@ -23,24 +29,25 @@ Write output in results folder
 """
 
 
-def main():
-    # Create Model with (n) agents
-    model = BaseModel(100)
+run_id = 1
+out_dir = "../results"
 
-    # Run Model (i) times
-    for i in range(1):
-        model.step()
+# Create Model with (n) agents
+model = BaseModel(100)
 
-    model_vars = model.datacollector.get_model_vars_dataframe()
-    agent_vars = model.datacollector.get_agent_vars_dataframe()
+agent_reporter = Reporter("agent",run_id,out_dir,model)
 
-    # create csv tables for model vars and agent vars and save it in results folder
-    #model_vars.to_csv("C:/Users/41782/Documents/MasterThesis/firmdynamic-abm/results/model_vars.csv", encoding="utf-8", index=False)
-    model_vars.to_csv("../results/model_vars.csv", encoding="utf-8",
-                      index=False)
+# Run Model (i) times
+for i in tqdm(range(100)):
+    model.step()
+    agent_reporter.on_step()
 
-    return model, model_vars, agent_vars
+# model_vars = model.datacollector.get_model_vars_dataframe()
+# agent_vars = model.datacollector.get_agent_vars_dataframe()
+#
+# # create csv tables for model vars and agent vars and save it in results folder
+# #model_vars.to_csv("C:/Users/41782/Documents/MasterThesis/firmdynamic-abm/results/model_vars.csv", encoding="utf-8", index=False)
+# model_vars.to_csv("../results/model_vars.csv", encoding="utf-8",
+#                   index=False)
 
-
-if __name__ == "__main__":
-    main()
+agent_reporter.close()

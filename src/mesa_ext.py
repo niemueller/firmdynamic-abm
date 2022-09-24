@@ -15,13 +15,22 @@ class SimultaneousActivationByType(RandomActivationByType):
         Args:
             type_class: Class object of the type to run.
         """
-        agent_keys: List[int] = list(self.agents_by_type[type_class].keys())
-        if shuffle_agents:
-            self.model.random.shuffle(agent_keys)
+
+        agent_keys = self.agents_by_type[type_class].keys()
         for agent_key in agent_keys:
             self.agents_by_type[type_class][agent_key].step()
-        # We recompute the keys because some agents might have been removed in
-        # the previous loop.
-        agent_keys: List[int] = list(self.agents_by_type[type_class].keys())
+
         for agent_key in agent_keys:
             self.agents_by_type[type_class][agent_key].advance()
+
+
+        # agent_keys: List[int] = list(self.agents_by_type[type_class].keys())
+        # if shuffle_agents:
+        #     self.model.random.shuffle(agent_keys)
+        # for agent_key in agent_keys:
+        #     self.agents_by_type[type_class][agent_key].step()
+        # # We recompute the keys because some agents might have been removed in
+        # # the previous loop.
+        # #agent_keys: List[int] = list(self.agents_by_type[type_class].keys())
+        # for agent_key in agent_keys:
+        #     self.agents_by_type[type_class][agent_key].advance()
