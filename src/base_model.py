@@ -5,7 +5,7 @@ from mesa import Agent, Model
 from mesa.time import RandomActivationByType
 from mesa.space import NetworkGrid
 from mesa.datacollection import DataCollector
-import pandas as pd
+import numpy as np
 import math
 import sys
 from operator import itemgetter
@@ -16,18 +16,18 @@ from operator import itemgetter
 
 
 def firm_output(a, b, beta, total_effort):
-    return (a * total_effort + b * total_effort ** beta)
+    return a * total_effort + b * total_effort ** beta
 
 
-def utility(effort, a, b, beta, theta, wealth, effort_others, number_employees):
+def utility(effort, a, b, beta, theta, endowment, effort_others, number_employees):
     return (-(((a * (effort + effort_others) + b * (effort + effort_others) ** beta) / number_employees) ** theta * (
-            wealth - effort) ** (1 - theta)))
+            endowment - effort) ** (1 - theta)))
 
 
-def log_utility(effort, a, b, beta, theta, wealth, effort_others, number_employees):
+def log_utility(effort, a, b, beta, theta, endowment, effort_others, number_employees):
     return -(theta * math.log10(
         (a * (effort + effort_others) + b * (effort + effort_others) ** beta) / number_employees) + (
-                      1 - theta) * math.log10(wealth - effort))
+                     1 - theta) * math.log10(endowment - effort))
 
 
 class Worker(Agent):
@@ -88,13 +88,13 @@ class Worker(Agent):
         b = current_firm.increasingReturnCoef
         beta = current_firm.increasingReturnExp
         theta = self.preference
-        wealth = self.endowment
+        endowment = self.endowment
         effort_others = self.get_effort_others_current_firm()
         number_employees = current_firm.get_employee_count()
         if effort_others < 0:
             print("Effort others negative")
             sys.exit()
-        param_tuple = (a, b, beta, theta, wealth, effort_others, number_employees)
+        param_tuple = (a, b, beta, theta, endowment, effort_others, number_employees)
         return param_tuple
 
     def get_fixed_param_tuple_other(self, firm) -> tuple:
@@ -102,13 +102,13 @@ class Worker(Agent):
         b = firm.increasingReturnCoef
         beta = firm.increasingReturnExp
         theta = self.preference
-        wealth = self.endowment
+        endowment = self.endowment
         effort_others = firm.total_effort
         number_employees = self.get_employee_count_plusone()
         if effort_others < 0:
             print("Effort others negative")
             sys.exit()
-        param_tuple = (a, b, beta, theta, wealth, effort_others, number_employees)
+        param_tuple = (a, b, beta, theta, endowment, effort_others, number_employees)
         return param_tuple
 
     def get_fixed_param_tuple_startup(self, current_firm):
@@ -116,21 +116,21 @@ class Worker(Agent):
         b = current_firm.increasingReturnCoef
         beta = current_firm.increasingReturnExp
         theta = self.preference
-        wealth = self.endowment
+        endowment = self.endowment
         effort_others = 0
         number_employees = 1
-        param_tuple = (a, b, beta, theta, wealth, effort_others, number_employees)
+        param_tuple = (a, b, beta, theta, endowment, effort_others, number_employees)
         return param_tuple
 
     def utility_max_object(self, params: tuple):
         effort_others = params[5]
-        wealth = params[4]
+        endowment = params[4]
         epsilon = sys.float_info.epsilon
         # if all others
         if effort_others == 0:
-            bnds = (epsilon, wealth - epsilon)
+            bnds = (epsilon, endowment - epsilon)
         else:
-            bnds = (0, wealth - epsilon)
+            bnds = (0, endowment - epsilon)
 
         optimization_output = opt.minimize_scalar(log_utility, args=params, method="bounded", bounds=bnds)
         if not optimization_output.success:
@@ -300,27 +300,29 @@ class Firm(Agent):
     def reset_new_employeeList(self):
         self.new_employeeList = []
 
+    def update_output(self):
+        if self.total_effort > 0:
+            output = firm_output(self.constantReturnCoef, self.increasingReturnCoef, self.increasingReturnExp,
+                                 self.total_effort)
+        else:
+            output = 0
+        self.output = output
+
     def step(self):
         self.age += 1
         self.employeeList = self.new_employeeList
         print(self.employeeList)
 
         if self.employeeList:
-            self.total_effort = self.get_sum_effort()
-            if self.total_effort > 0:
-                output = firm_output(self.constantReturnCoef, self.increasingReturnCoef, self.increasingReturnExp,
-                                     self.total_effort)
-                output_share = output / self.get_employee_count()
-                print(output_share)
-                self.output = output
-                for agent in self.employeeList:
-                    agent.wealth += output_share
-                    agent.income = output_share
-            else:
-                self.output = 0
-                for agent in self.employeeList:
-                    agent.income = 0
+            self.update_total_effort()
+            self.update_output()
+            output_share = self.output / self.get_employee_count()
+            print(output_share)
+            for agent in self.employeeList:
+                agent.wealth += output_share
+                agent.income = output_share
         else:
+            self.output = 0
             self.model.dead_firms.append(self)
 
     def advance(self):
@@ -340,9 +342,13 @@ class BaseModel(Model):
         self.schedule = RandomActivationByType(self)
         self.current_id = 0
         self.dead_firms = []
+        self.firm_distr = []
         self.datacollector = DataCollector(
-            # model_reporters={"Size": self.get_firm_size_distribution()},
-            agent_reporters={"wealth": lambda w: getattr(w, "endowment", None)}
+            # model_reporters= {"Firm Size Distribution": self.get_firm_size_distribution()}
+            # {"Average_Output": average_output}
+            #                 },
+            agent_reporters={"wealth": lambda w: getattr(w, "wealth", None),
+                             "output": lambda o: getattr(o, "output", None)}
         )
 
         # Create agents
@@ -358,17 +364,35 @@ class BaseModel(Model):
             # Add agent to a node
             self.grid.place_agent(worker, i)
 
-    # Data collector functions
     def get_firm_size_distribution(self):
-        firm_sizes = [len(firm.employeeList) for firm in self.schedule.agents_by_type[Firm]]
+        firm_sizes = [firm.get_employee_count() for firm in self.schedule.agents_by_type[Firm].values()]
         x = sorted(firm_sizes)
         return x
 
     def step(self):
         """Advance the model by one step."""
+        print(self.schedule.agents_by_type[Firm].values())
+        self.firm_distr = self.get_firm_size_distribution()
         self.datacollector.collect(self)
         self.schedule.step(shuffle_types=False)
 
         for x in self.dead_firms:
             self.schedule.remove(x)
             self.dead_firms = []
+
+
+# Helper functions
+
+# Data collector functions
+def get_firm_size_distribution(model):
+    firm_sizes = [firm.get_employee_count() for firm in model.schedule.agents_by_type[Firm]]
+    x = sorted(firm_sizes)
+    return x
+
+
+def average_output(model):
+    firms_output = [firm.output for firm in model.schedule.agents_by_type[Firm]]
+    if firms_output:
+        return np.mean(firms_output)
+    else:
+        return 0.0
