@@ -27,9 +27,10 @@ def utility(effort, a, b, beta, theta, endowment, effort_others, number_employee
 
 
 def log_utility(effort, a, b, beta, theta, endowment, effort_others, number_employees):
-    return -(theta * math.log10(
+    return -(theta * np.log(
         (a * (effort + effort_others) + b * (effort + effort_others) ** beta) / number_employees) + (
-                     1 - theta) * math.log10(endowment - effort))
+                     1 - theta) * np.log(endowment - effort))
+
 
 class MyAgent(Agent):
 
@@ -43,6 +44,7 @@ class MyAgent(Agent):
 
     def getStepResults(self):
         raise NotImplementedError()
+
 
 class Worker(MyAgent):
     """
@@ -365,12 +367,14 @@ class BaseModel(Model):
         self.num_agents = num_agents  # equals number of nodes (each agent on one node)
         # Set network
         prob = avg_node_degree / self.num_agents
-        self.G = nx.erdos_renyi_graph(n=self.num_agents, p=prob)
+        logging.info("create graph")
+        self.G = nx.fast_gnp_random_graph(n=self.num_agents, p=prob)
         self.grid = NetworkGrid(self.G)
         self.schedule = SimultaneousActivationByType(self)
         self.current_id = 0
         self.dead_firms = []
         self.firm_distr = []
+        logging.info("graph done")
         # self.datacollector = DataCollector(
         #     # model_reporters= {"Firm Size Distribution": self.get_firm_size_distribution()}
         #     # {"Average_Output": average_output}

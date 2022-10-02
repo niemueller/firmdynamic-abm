@@ -24,21 +24,21 @@ logging.basicConfig(level=logging.INFO)
 # config = load_config("config.yaml")
 
 """
-Run BaseModel a 100 times
+Run BaseModel x times
 Write output in results folder
 """
 
 
-run_id = 1
+run_id = 2
 out_dir = "../results"
 
 # Create Model with (n) agents
-model = BaseModel(100)
+model = BaseModel(500)
 
-agent_reporter = Reporter("agent",run_id,out_dir,model)
+agent_reporter = Reporter("agent", run_id, out_dir, model)
 
 # Run Model (i) times
-for i in tqdm(range(100)):
+for i in tqdm(range(500)):
     model.step()
     agent_reporter.on_step()
 
