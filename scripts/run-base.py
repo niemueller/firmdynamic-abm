@@ -32,7 +32,7 @@ out_dir = "../results"
 attribute_worker_tuple = ("effort", "job_event", "wealth", "income")
 attribute_firm_tuple = ("age", "number_employees", "total_effort", "output")
 # Create Model with (n) agents
-model = BaseModel(10)
+model = BaseModel(100)
 
 agent_reporter = Reporter("agent", run_id, out_dir, model, attribute_worker_tuple, attribute_firm_tuple)
 
