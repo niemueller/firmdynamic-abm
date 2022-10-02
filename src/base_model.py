@@ -11,7 +11,6 @@ import math
 import sys
 from operator import itemgetter
 
-
 # would be useful for defining intervals (open intervals) (intervals renamed to portion but could not install)
 # import portion as P not used, delete package
 from src.mesa_ext import SimultaneousActivationByType
@@ -39,11 +38,20 @@ class MyAgent(Agent):
         self.type = type
 
     @staticmethod
-    def getResultsHeader():
-        raise NotImplementedError()
+    def getResultsHeader(*args):
+        converted_list = [str(arg) for arg in args]
+        joined_string = ",".join(converted_list)
+        return joined_string
 
-    def getStepResults(self):
-        raise NotImplementedError()
+    # @staticmethod
+    # def getResultsHeader(attribute):
+    #     return ['"' + attribute + '"']
+
+    def getStepResults(self, attribute_tuple):
+        a_list = []
+        for arg in attribute_tuple:
+            a_list.append(getattr(self, arg))
+        return a_list
 
 
 class Worker(MyAgent):
@@ -53,7 +61,7 @@ class Worker(MyAgent):
     """
 
     def __init__(self, unique_id, model):
-        super().__init__(unique_id, model,"W")
+        super().__init__(unique_id, model, "W")
         self.endowment = 1
         self.preference = random.uniform(0, 1)
         # create open-open interval (random.uniform is [,))
@@ -68,12 +76,12 @@ class Worker(MyAgent):
         self.wealth = 0
         self.income = None
 
-    @staticmethod
-    def getResultsHeader():
-        return ["wealth"]
+        # @staticmethod
+        # def getResultsHeader(attribute):
+        #     return ['"'+attribute+'"']
 
-    def getStepResults(self):
-        return [str(self.wealth)]
+    # def getStepResults(self):
+    #     return [str(self.wealth)]
 
     @property
     def endowment(self):
@@ -244,7 +252,7 @@ class Worker(MyAgent):
             self.active = True
             # The agent's step will go here
             max_tuple = self.get_max_tuple(self.get_total_max_list())
-            #print(max_tuple)
+            # print(max_tuple)
             self.newFirm = max_tuple[0]
             self.job_event = max_tuple[1]
             self.effort = max_tuple[2]
@@ -280,7 +288,7 @@ class Firm(MyAgent):
     """Heterogeneous Firms in the model with random production function coefficients"""
 
     def __init__(self, unique_id, model):
-        super().__init__(unique_id, model,"F")
+        super().__init__(unique_id, model, "F")
 
         # Random a,b and beta for each firm, todo: rewrite hardcoded part and define them in params script
         self.constantReturnCoef = random.uniform(0, 0.5)
@@ -293,13 +301,13 @@ class Firm(MyAgent):
         self.age = 0  # start with 0 or 1?
         self.total_effort = 0
         self.output = 0
+        self.number_employees = 1
+    # @staticmethod
+    # def getResultsHeader(attribute):
+    #     return ['"' + attribute + '"']
 
-    @staticmethod
-    def getResultsHeader():
-        return ["output"]
-
-    def getStepResults(self):
-        return [str(self.output)]
+    # def getStepResults(self):
+    #     return [str(self.output)]
 
     @property
     def total_effort(self):
@@ -341,13 +349,13 @@ class Firm(MyAgent):
         self.age += 1
         self.employeeList = self.new_employeeList
         logging.debug(f"Age:{self.age}\tNumEmployees: {len(self.employeeList)}")
-        #print(self.employeeList)
+        # print(self.employeeList)
 
         if self.employeeList:
             self.update_total_effort()
             self.update_output()
             output_share = self.output / self.get_employee_count()
-            #print(output_share)
+            # print(output_share)
             for agent in self.employeeList:
                 agent.wealth += output_share
                 agent.income = output_share
@@ -357,7 +365,7 @@ class Firm(MyAgent):
 
     def advance(self):
         self.reset_new_employeeList()
-
+        self.number_employees = self.get_employee_count()
 
 class BaseModel(Model):
     """A model with N agents connected in a network"""
@@ -405,10 +413,10 @@ class BaseModel(Model):
 
     def step(self):
         """Advance the model by one step."""
-        #logging.info(f"Step: {self.schedule.steps}")
-        #print(self.schedule.agents_by_type[Firm].values())
+        # logging.info(f"Step: {self.schedule.steps}")
+        # print(self.schedule.agents_by_type[Firm].values())
         self.firm_distr = self.get_firm_size_distribution()
-        #self.datacollector.collect(self)
+        # self.datacollector.collect(self)
         self.schedule.step(shuffle_types=False, shuffle_agents=False)
 
         for x in self.dead_firms:

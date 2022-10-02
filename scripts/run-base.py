@@ -7,7 +7,6 @@ import os
 import logging
 from src.reporter import Reporter
 
-
 logging.basicConfig(level=logging.INFO)
 # folder to load config file
 # CONFIG_PATH = "config/"
@@ -28,19 +27,19 @@ Run BaseModel x times
 Write output in results folder
 """
 
-
-run_id = 2
+run_id = 3
 out_dir = "../results"
-
+attribute_worker_tuple = ("effort", "job_event", "wealth", "income")
+attribute_firm_tuple = ("age", "number_employees", "total_effort", "output")
 # Create Model with (n) agents
-model = BaseModel(500)
+model = BaseModel(10)
 
-agent_reporter = Reporter("agent", run_id, out_dir, model)
+agent_reporter = Reporter("agent", run_id, out_dir, model, attribute_worker_tuple, attribute_firm_tuple)
 
 # Run Model (i) times
 for i in tqdm(range(500)):
     model.step()
-    agent_reporter.on_step()
+    agent_reporter.on_step(attribute_worker_tuple, attribute_firm_tuple)
 
 # model_vars = model.datacollector.get_model_vars_dataframe()
 # agent_vars = model.datacollector.get_agent_vars_dataframe()
