@@ -11,7 +11,7 @@
       <excludeFolder url="file://$MODULE_DIR$/env/Lib/site-packages/pandas/tests/io/data" />
       <excludeFolder url="file://$MODULE_DIR$/data" />
     </content>
-    <orderEntry type="jdk" jdkName="Python 3.9 (abm-env)" jdkType="Python SDK" />
+    <orderEntry type="jdk" jdkName="Remote Python 3.9.2 (sftp://debian@172.23.192.2:22/usr/bin/python3)" jdkType="Python SDK" />
     <orderEntry type="sourceFolder" forTests="false" />
   </component>
   <component name="PackageRequirementsSettings">

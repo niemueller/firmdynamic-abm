@@ -75,6 +75,7 @@ class Worker(MyAgent):
         self.active = False
         self.wealth = 0
         self.income = None
+        self.tenure = 0
 
         # @staticmethod
         # def getResultsHeader(attribute):
@@ -245,10 +246,16 @@ class Worker(MyAgent):
     def get_max_tuple(self, list_of_tuples) -> tuple:
         return max(list_of_tuples, key=itemgetter(3))
 
+    def increase_tenure(self):
+        self.tenure += 1
+
+    def reset_tenure(self):
+        self.tenure = 0
+
     def step(self):
 
         # activate agent with certain probability (4% of agents are activated each period on average)
-        if random.random() <= 1:
+        if random.random() <= 0.04:
             self.active = True
             # The agent's step will go here
             max_tuple = self.get_max_tuple(self.get_total_max_list())
@@ -282,6 +289,10 @@ class Worker(MyAgent):
 
     def advance(self):
         self.currentFirm = self.newFirm
+        if self.job_event == "stay" or self.job_event == "not_active":
+            self.increase_tenure()
+        else:
+            self.reset_tenure()
 
 
 class Firm(MyAgent):
@@ -302,6 +313,8 @@ class Firm(MyAgent):
         self.total_effort = 0
         self.output = 0
         self.number_employees = 1
+        self.average_pref = None
+
     # @staticmethod
     # def getResultsHeader(attribute):
     #     return ['"' + attribute + '"']
@@ -333,6 +346,12 @@ class Firm(MyAgent):
 
     def get_employee_count(self):
         return len(self.employeeList)
+
+    def compute_average_preference(self):
+        pref_list = []
+        for a in self.employeeList:
+            pref_list.append(a.effort)
+        return np.mean(pref_list)
 
     def reset_new_employeeList(self):
         self.new_employeeList = []
@@ -366,6 +385,8 @@ class Firm(MyAgent):
     def advance(self):
         self.reset_new_employeeList()
         self.number_employees = self.get_employee_count()
+        self.average_pref = self.compute_average_preference()
+
 
 class BaseModel(Model):
     """A model with N agents connected in a network"""
@@ -382,6 +403,7 @@ class BaseModel(Model):
         self.current_id = 0
         self.dead_firms = []
         self.firm_distr = []
+        self.number_exit = 0
         logging.info("graph done")
         # self.datacollector = DataCollector(
         #     # model_reporters= {"Firm Size Distribution": self.get_firm_size_distribution()}
@@ -411,17 +433,18 @@ class BaseModel(Model):
         x = sorted(firm_sizes)
         return x
 
+
     def step(self):
         """Advance the model by one step."""
         # logging.info(f"Step: {self.schedule.steps}")
         # print(self.schedule.agents_by_type[Firm].values())
-        self.firm_distr = self.get_firm_size_distribution()
         # self.datacollector.collect(self)
         self.schedule.step(shuffle_types=False, shuffle_agents=False)
 
         for x in self.dead_firms:
             self.schedule.remove(x)
-            self.dead_firms = []
+
+        self.dead_firms = []
 
 
 # Helper functions

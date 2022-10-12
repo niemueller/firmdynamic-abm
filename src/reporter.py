@@ -1,3 +1,5 @@
+import gzip
+
 from src.base_model import BaseModel, Worker, Firm
 
 
@@ -8,15 +10,15 @@ class Reporter:
         self.model: BaseModel = model
         self.step_idx = 0
 
-        path_w = f"{out_dir}/res_worker_{name}_run{runid}.csv"
-        self.out_w = open(path_w, "w")
+        path_w = f"{out_dir}/res_worker_{name}_run{runid}.csv.gz"
+        self.out_w = gzip.open(path_w, "wt")
 
         worker = ",".join(attributes_worker_tuple)
         header = f"t,id,{worker}\n"
         self.out_w.write(header)
 
-        path_f = f"{out_dir}/res_firm_{name}_run{runid}.csv"
-        self.out_f = open(path_f, "w")
+        path_f = f"{out_dir}/res_firm_{name}_run{runid}.csv.gz"
+        self.out_f = gzip.open(path_f, "wt")
 
         firm = ",".join(attributes_firm_tuple)
         header = f"t,id,{firm}\n"
