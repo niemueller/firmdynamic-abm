@@ -42,6 +42,6 @@ class Reporter:
                 resLine = ",".join(str(v) for v in resArr)
                 outFile = self.out_f
 
-            outFile.write(f"{self.step_idx}, {a.unique_id}, {resLine}\n")
+            outFile.write(f"{self.step_idx},{a.unique_id},{resLine}\n")
 
         self.step_idx += 1

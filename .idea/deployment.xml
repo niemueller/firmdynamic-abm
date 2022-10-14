@@ -1,11 +1,25 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <project version="4">
-  <component name="PublishConfigData" autoUpload="Always" serverName="debian@172.23.192.2:22 key">
+  <component name="PublishConfigData" autoUpload="Always">
     <serverData>
       <paths name="debian@172.23.192.2:22 key">
         <serverdata>
           <mappings>
             <mapping deploy="/home/debian/abm" local="$PROJECT_DIR$" web="/" />
+          </mappings>
+        </serverdata>
+      </paths>
+      <paths name="debian@172.23.196.11:22">
+        <serverdata>
+          <mappings>
+            <mapping deploy="/tmp/pycharm_project_352" local="$PROJECT_DIR$" />
+          </mappings>
+        </serverdata>
+      </paths>
+      <paths name="debian@172.23.196.11:22 (2)">
+        <serverdata>
+          <mappings>
+            <mapping deploy="/tmp/pycharm_project_680" local="$PROJECT_DIR$" />
           </mappings>
         </serverdata>
       </paths>
