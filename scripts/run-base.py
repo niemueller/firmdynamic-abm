@@ -24,17 +24,17 @@ Run BaseModel x times
 Write output in results folder
 """
 
-run_id = "2200_grid"
+run_id = "120_bounded_1"
 out_dir = "../results"
 attribute_worker_tuple = ("effort", "job_event", "wealth", "income", "job_event", "tenure", "preference")
 attribute_firm_tuple = ("age", "number_employees", "total_effort", "output", "average_pref")
 # Create Model with (n) agents
-model = BaseModel(2200)
+model = BaseModel(120000)
 
 agent_reporter = Reporter("agent", run_id, out_dir, model, attribute_worker_tuple, attribute_firm_tuple)
 
 # Run Model (i) times
-for i in tqdm(range(5000)):
+for i in tqdm(range(3000)):
     model.step()
     agent_reporter.on_step(attribute_worker_tuple, attribute_firm_tuple)
 
