@@ -3,7 +3,7 @@ from tqdm import tqdm
 from src.base_model import BaseModel
 import logging
 from src.reporter import Reporter
-import src.visualisation
+# import src.visualisation
 logging.basicConfig(level=logging.INFO)
 # folder to load config file
 # CONFIG_PATH = "config/"
