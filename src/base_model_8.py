@@ -255,7 +255,7 @@ class Worker(MyAgent):
     def step(self):
 
         # activate agent with certain probability (4% of agents are activated each period on average)
-        if random.random() <= 0.04:
+        if random.random() <= 0.08:
             self.active = True
             # The agent's step will go here
             max_tuple = self.get_max_tuple(self.get_total_max_list())
