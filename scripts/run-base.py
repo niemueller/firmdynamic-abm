@@ -30,7 +30,7 @@ Write output in results folder
 
 run_id = 5
 number_of_steps = 3000
-number_of_agents = 1000
+number_of_agents = 2200000
 out_dir = "../results"
 number_of_active_agents = 0.05
 attribute_worker_tuple = ("effort", "job_event", "wealth", "income", "job_event", "tenure", "preference")
