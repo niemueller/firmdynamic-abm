@@ -35,7 +35,7 @@ out_dir = "../results"
 number_of_active_agents = 0.05
 attribute_worker_tuple = ("effort", "job_event", "wealth", "income", "job_event", "tenure", "preference")
 attribute_firm_tuple = ("age", "number_employees", "total_effort", "output", "average_pref")
-optimization = (1, 2, 3)
+optimization = 2
 # Create Model with (n) agents
 if type(optimization) == int:
     model = BaseModel(number_of_agents, optimization, number_of_active_agents)
