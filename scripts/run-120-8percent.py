@@ -1,6 +1,7 @@
 from tqdm import tqdm
 
-from src.base_model_8 import BaseModel
+import random
+from src.base_model_grid import BaseModel
 import logging
 from src.reporter import Reporter
 # import src.visualisation
@@ -15,7 +16,8 @@ logging.basicConfig(level=logging.INFO)
 #         config = yaml.safe_load(file)
 #
 #     return config
-
+# define seed for whole run
+random.seed(1111)
 
 # config = load_config("config.yaml")
 
@@ -29,12 +31,12 @@ out_dir = "../results"
 attribute_worker_tuple = ("effort", "job_event", "wealth", "income", "job_event", "tenure", "preference")
 attribute_firm_tuple = ("age", "number_employees", "total_effort", "output", "average_pref")
 # Create Model with (n) agents
-model = BaseModel(120000)
+model = BaseModel(10000)
 
 agent_reporter = Reporter("agent", run_id, out_dir, model, attribute_worker_tuple, attribute_firm_tuple)
 
 # Run Model (i) times
-for i in tqdm(range(3000)):
+for i in tqdm(range(2000)):
     model.step()
     agent_reporter.on_step(attribute_worker_tuple, attribute_firm_tuple)
 

@@ -5,19 +5,19 @@ from src.base_model import BaseModel, Worker, Firm
 
 class Reporter:
 
-    def __init__(self, name, runid, out_dir, model, attributes_worker_tuple, attributes_firm_tuple):
+    def __init__(self, name, runid, out_dir, model, attributes_worker_tuple, attributes_firm_tuple, optimization_type):
 
         self.model: BaseModel = model
         self.step_idx = 0
 
-        path_w = f"{out_dir}/res_worker_{name}_run{runid}.csv.gz"
+        path_w = f"{out_dir}/res_worker_{name}_run{runid}_opttype{optimization_type}.csv.gz"
         self.out_w = gzip.open(path_w, "wt")
 
         worker = ",".join(attributes_worker_tuple)
         header = f"t,id,{worker}\n"
         self.out_w.write(header)
 
-        path_f = f"{out_dir}/res_firm_{name}_run{runid}.csv.gz"
+        path_f = f"{out_dir}/res_firm_{name}_run{runid}_opttype{optimization_type}.csv.gz"
         self.out_f = gzip.open(path_f, "wt")
 
         firm = ",".join(attributes_firm_tuple)

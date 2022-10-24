@@ -1,5 +1,7 @@
 import logging
 import random
+
+import pandas as pd
 import scipy.optimize as opt
 import networkx as nx
 from mesa import Agent, Model
@@ -57,11 +59,12 @@ class MyAgent(Agent):
 class Worker(MyAgent):
     """
     An individual agent represented by a node in a network
-    With initial endowment 1 and preference e between 0 and 1
+    With endowment 1 and preference e between 0 and 1
     """
 
     def __init__(self, unique_id, model):
         super().__init__(unique_id, model, "W")
+        self.model = model
         self.endowment = 1
         self.preference = random.uniform(0, 1)
         # create open-open interval (random.uniform is [,))
@@ -103,6 +106,12 @@ class Worker(MyAgent):
         if value < 0:
             raise ValueError("Effort cannot be negative")
         self._effort = value
+
+    # def create_parameter_table(self):
+    #     col_names = ["firm_id", "move_type", "param_tuple", "effort", "utility"]
+    #     df = pd.DataFrame(columns=col_names)
+    #     return df
+
 
     def get_effort_others_current_firm(self) -> float:
         firm = self.currentFirm
@@ -168,20 +177,24 @@ class Worker(MyAgent):
         if not optimization_output.success:
             raise ValueError("Optimization not successful")
         else:
-            return optimization_output
+            effort_star = optimization_output.x
+            utility_star = -optimization_output.fun
+            return effort_star, utility_star
 
-    def utility_max_object_grid(self, params: tuple):
+    def utility_max_object_grid(self, gridsize: int, params: tuple):
         effort_others = params[5]
         endowment = params[4]
-        epsilon = sys.float_info.epsilon
+        grid_step = endowment/gridsize
         # if all others
         if effort_others == 0:
-            grid = np.arange(0.1, 1, 0.1).tolist()
+            grid = np.arange(grid_step, 1, grid_step).tolist()
+            initial_effort = 0.1
         else:
-            grid = np.arange(0, 1, 0.1).tolist()
+            grid = np.arange(0, 1, grid_step).tolist()
+            initial_effort = 0
 
         initial_utility = 0
-        initial_effort = 0
+
         for i in grid:
             utility_temp = -log_utility(i, params[0], params[1], params[2],
                                         params[3], params[4], params[5], params[6])
@@ -189,14 +202,6 @@ class Worker(MyAgent):
                 initial_utility = utility_temp
                 initial_effort = i
         return initial_effort, initial_utility
-
-
-
-    def effort_star(self, optimization_output):
-        return optimization_output.x
-
-    def utility_star(self, optimization_output):
-        return -optimization_output.fun
 
     def get_neighbors(self):
         return self.model.grid.get_neighbors(self.pos, include_center=False)
@@ -214,9 +219,20 @@ class Worker(MyAgent):
 
     def network_firm_maximization(self, firm_object):
         params = self.get_fixed_param_tuple_other(firm_object)
-        utility_object = self.utility_max_object(params)
-        max_utility = self.utility_star(utility_object)
-        max_effort = self.effort_star(utility_object)
+        # choose optimization type:
+        if self.model.OPTIMIZATION == 1:
+            utility_object = self.utility_max_object(params)
+        elif self.model.OPTIMIZATION == 2:
+            utility_object = self.utility_max_object_grid(gridsize=10, params=params)
+        elif self.model.OPTIMIZATION == 3:
+            utility_object = self.utility_max_object_grid(gridsize=100, params=params)
+        elif self.model.OPTIMIZATION == 4:
+            utility_object = self.utility_max_object_grid(gridsize=1000, params=params)
+        else:
+            utility_object = self.utility_max_object(params)
+
+        max_effort = utility_object[0]
+        max_utility = utility_object[1]
         # return tuple (len4)
         return firm_object, "join_other", max_effort, max_utility
 
@@ -233,9 +249,20 @@ class Worker(MyAgent):
     def current_firm_maximization(self):
         firm_object = self.currentFirm
         params = self.get_fixed_param_tuple_current()
-        utility_object = self.utility_max_object(params)
-        max_effort = self.effort_star(utility_object)
-        max_utility = self.utility_star(utility_object)
+        # choose optimization type:
+        if self.model.OPTIMIZATION == 1:
+            utility_object = self.utility_max_object(params)
+        elif self.model.OPTIMIZATION == 2:
+            utility_object = self.utility_max_object_grid(gridsize=10, params=params)
+        elif self.model.OPTIMIZATION == 3:
+            utility_object = self.utility_max_object_grid(gridsize=100, params=params)
+        elif self.model.OPTIMIZATION == 4:
+            utility_object = self.utility_max_object_grid(gridsize=1000, params=params)
+        else:
+            utility_object = self.utility_max_object(params)
+
+        max_effort = utility_object[0]
+        max_utility = utility_object[1]
         # return tuple (len4)
         return firm_object, "stay", max_effort, max_utility
 
@@ -246,9 +273,21 @@ class Worker(MyAgent):
     def startup_maximization(self):
         startup = self.create_startup()
         params = self.get_fixed_param_tuple_startup(startup)
-        utility_object = self.utility_max_object(params)
-        startup_effort = self.effort_star(utility_object)
-        startup_utility = self.utility_star(utility_object)
+        # choose optimization type:
+        if self.model.OPTIMIZATION == 1:
+            utility_object = self.utility_max_object(params)
+        elif self.model.OPTIMIZATION == 2:
+            utility_object = self.utility_max_object_grid(gridsize=10, params=params)
+        elif self.model.OPTIMIZATION == 3:
+            utility_object = self.utility_max_object_grid(gridsize=100, params=params)
+        elif self.model.OPTIMIZATION == 4:
+            utility_object = self.utility_max_object_grid(gridsize=1000, params=params)
+        else:
+            utility_object = self.utility_max_object(params)
+
+
+        startup_effort = utility_object[0]
+        startup_utility = utility_object[1]
         # return tuple (len4)
         return startup, "startup", startup_effort, startup_utility
 
@@ -277,7 +316,7 @@ class Worker(MyAgent):
     def step(self):
 
         # activate agent with certain probability (4% of agents are activated each period on average)
-        if random.random() <= 0.04:
+        if random.random() <= self.model.activate:
             self.active = True
             # The agent's step will go here
             max_tuple = self.get_max_tuple(self.get_total_max_list())
@@ -413,9 +452,17 @@ class Firm(MyAgent):
 class BaseModel(Model):
     """A model with N agents connected in a network"""
 
-    def __init__(self, num_agents, avg_node_degree=4):
+    def __init__(self, num_agents, optimization: int, activate: float, avg_node_degree=4):
         # Number of agents
         self.num_agents = num_agents  # equals number of nodes (each agent on one node)
+        # Optimization used:
+        # 1 = bounded scipy algorithm: slow
+        # 2 = grid search 0.1 interval: fastest
+        # 3 = grid search 0.01 interval: faster than 1
+        # 4 = grid search 0.001 interval
+        self.OPTIMIZATION = optimization
+        # number of active agents per period (floating decimal, corresponds to monthly job searches)
+        self.activate = activate
         # Set network
         prob = avg_node_degree / self.num_agents
         logging.info("create graph")
