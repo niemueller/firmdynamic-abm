@@ -52,7 +52,12 @@ class MyAgent(Agent):
     def getStepResults(self, attribute_tuple):
         a_list = []
         for arg in attribute_tuple:
-            a_list.append(getattr(self, arg))
+            x = getattr(self, arg)
+            if type(x) != str:
+                a_list.append(round(getattr(self, arg), 3))
+            else:
+                a_list.append(getattr(self, arg))
+
         return a_list
 
 

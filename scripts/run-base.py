@@ -28,12 +28,12 @@ Run BaseModel x times
 Write output in results folder
 """
 
-run_id = 5
-number_of_steps = 3000
-number_of_agents = 2200000
+run_id = "4mio"
+number_of_steps = 1000
+number_of_agents = 4000000
 out_dir = "../results"
-number_of_active_agents = 0.05
-attribute_worker_tuple = ("effort", "job_event", "wealth", "income", "job_event", "tenure", "preference")
+number_of_active_agents = 0.04
+attribute_worker_tuple = ("effort", "wealth", "income", "job_event", "tenure", "preference")
 attribute_firm_tuple = ("age", "number_employees", "total_effort", "output", "average_pref")
 optimization = 2
 # Create Model with (n) agents
