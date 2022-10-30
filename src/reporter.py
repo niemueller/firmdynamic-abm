@@ -5,7 +5,15 @@ from src.base_model import BaseModel, Worker, Firm
 
 class Reporter:
 
-    def __init__(self, name, runid, out_dir, model, attributes_worker_tuple, attributes_firm_tuple, optimization_type):
+    def __init__(self,
+                 name,
+                 runid,
+                 out_dir,
+                 model,
+                 attributes_worker_tuple,
+                 attributes_firm_tuple,
+                 attributes_model_tuple,
+                 optimization_type):
 
         self.model: BaseModel = model
         self.step_idx = 0
@@ -24,11 +32,19 @@ class Reporter:
         header = f"t,id,{firm}\n"
         self.out_f.write(header)
 
+        path_m = f"{out_dir}/res_model_{name}_run{runid}_opttype{optimization_type}.csv.gz"
+        self.out_m = gzip.open(path_m, "wt")
+
+        model = ",".join(attributes_model_tuple)
+        header = f"t,{model}\n"
+        self.out_m.write(header)
+
     def close(self):
         self.out_w.close()
         self.out_f.close()
+        self.out_m.close()
 
-    def on_step(self, attributes_worker_tuple, attributes_firm_tuple):
+    def on_step(self, attributes_worker_tuple, attributes_firm_tuple, attributes_model_tuple):
 
         for a in self.model.schedule.agents:
             outFile = None
@@ -43,5 +59,11 @@ class Reporter:
                 outFile = self.out_f
 
             outFile.write(f"{self.step_idx},{a.unique_id},{resLine}\n")
+
+        outFile = None
+        resArr = self.model.getStepResults(attributes_model_tuple)
+        resLine = ",".join(str(v) for v in resArr)
+        outFile = self.out_m
+        outFile.write(f"{self.step_idx},{resLine}\n")
 
         self.step_idx += 1

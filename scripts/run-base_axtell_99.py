@@ -22,28 +22,41 @@ logging.basicConfig(level=logging.INFO)
 
 # config = load_config("config.yaml")
 # define seed for whole run
-random.seed(1111)
+random.seed(1112)
 """
 Run BaseModel x times
 Write output in results folder
 """
 
-run_id = "beta4"
+# Meta Data
+run_id = 200
+out_dir = "../results/axtell_99"
+# Firm Parameters
 CONSTANT_RETURNS_COEF_A = 1
 INCREASING_RETURNS_COEF_B = 1
 INCREASING_RETURNS_EXP_BETA = 2
+# Worker Parameters
+# DIST_PREFERENCES_THETA = random.uniform(0, 1)
+# Model Parameters
+number_of_steps = 1000
+number_of_agents = 100
+number_of_active_agents = 1
+# activation type 1 = simultaneous, 2 = asynchroneous (random)
+ACTIVATION_TYPE = 2
 
-number_of_steps = 1500
-number_of_agents = 1000
-out_dir = "../results"
-number_of_active_agents = 0.04
 attribute_worker_tuple = ("effort", "wealth", "income", "job_event", "tenure", "preference")
 attribute_firm_tuple = ("age", "number_employees", "total_effort", "output", "average_pref")
 attributes_model_tuple = ("total_firms", "numb_new_firms", "numb_dead_firms")
-optimization = 2
+optimization = (1, 2)
 # Create Model with (n) agents
 if type(optimization) == int:
-    model = BaseModel(number_of_agents, optimization, number_of_active_agents)
+    model = BaseModel(number_of_agents,
+                      CONSTANT_RETURNS_COEF_A,
+                      INCREASING_RETURNS_COEF_B,
+                      INCREASING_RETURNS_EXP_BETA,
+                      optimization,
+                      number_of_active_agents,
+                      ACTIVATION_TYPE)
 
     agent_reporter = Reporter("agent",
                               run_id,
@@ -57,12 +70,19 @@ if type(optimization) == int:
     # Run Model (i) times
     for i in tqdm(range(number_of_steps)):
         model.step()
-        agent_reporter.on_step(attribute_worker_tuple, attribute_firm_tuple)
+        agent_reporter.on_step(attribute_worker_tuple, attribute_firm_tuple, attributes_model_tuple)
+        model.reset_stats()
     agent_reporter.close()
 
 else:
     for x in optimization:
-        model = BaseModel(number_of_agents, x, number_of_active_agents)
+        model = BaseModel(number_of_agents,
+                          CONSTANT_RETURNS_COEF_A,
+                          INCREASING_RETURNS_COEF_B,
+                          INCREASING_RETURNS_EXP_BETA,
+                          optimization,
+                          number_of_active_agents,
+                          ACTIVATION_TYPE)
 
         agent_reporter = Reporter("agent",
                                   run_id,
@@ -77,6 +97,7 @@ else:
         for i in tqdm(range(number_of_steps)):
             model.step()
             agent_reporter.on_step(attribute_worker_tuple, attribute_firm_tuple, attributes_model_tuple)
+            model.reset_stats()
 
         agent_reporter.close()
 

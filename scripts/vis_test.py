@@ -6,7 +6,7 @@ import dask.dataframe as dd
 optimization_type = 2
 out_dir = "../results"
 name = "agent"
-runid = "102"
+runid = "beta4"
 plot_style = "fivethirtyeight"
 
 path_w = f"{out_dir}/res_worker_{name}_run{runid}_opttype{optimization_type}.csv.gz"

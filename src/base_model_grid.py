@@ -79,6 +79,7 @@ class Worker(MyAgent):
         self.currentFirm = None
         self.newFirm = None
         self.effort = 0
+        self.oldeffort = 0
         self.job_event = None
         self.active = False
         self.wealth = 0
@@ -320,38 +321,85 @@ class Worker(MyAgent):
 
     def step(self):
 
-        # activate agent with certain probability (4% of agents are activated each period on average)
-        if random.random() <= self.model.activate:
-            self.active = True
-            # The agent's step will go here
-            max_tuple = self.get_max_tuple(self.get_total_max_list())
-            # print(max_tuple)
-            self.newFirm = max_tuple[0]
-            self.job_event = max_tuple[1]
-            self.effort = max_tuple[2]
+        if self.model.activation_type == 1:
+            # activate agent with certain probability (4% of agents are activated each period on average)
+            if random.random() <= self.model.activate:
+                self.active = True
+                # The agent's step will go here
+                max_tuple = self.get_max_tuple(self.get_total_max_list())
+                # print(max_tuple)
+                self.newFirm = max_tuple[0]
+                self.job_event = max_tuple[1]
+                self.effort = max_tuple[2]
 
-            if self.effort >= self.endowment:
-                print("Effort bigger than endowment")
-                sys.exit()
+                if self.effort >= self.endowment:
+                    print("Effort bigger than endowment")
+                    sys.exit()
 
-            # self.endowment -= self.effort
+                # self.endowment -= self.effort
 
-            if self.job_event != "startup":
-                self.model.current_id -= 1
-            elif self.job_event == "startup":
-                self.model.schedule.add(self.newFirm)
+                if self.job_event != "startup":
+                    self.model.current_id -= 1
+                elif self.job_event == "startup":
+                    self.model.schedule.add(self.newFirm)
+                    self.model.add_new_firm()
+                else:
+                    print("There should not be a third option")
+
+                # update Firm Agent
+                self.newFirm.new_employeeList.append(self)
             else:
-                print("There should not be a third option")
-
-            # update Firm Agent
-            self.newFirm.new_employeeList.append(self)
+                self.active = False
+                max_tuple = self.current_firm_maximization()
+                self.newFirm = self.currentFirm
+                self.job_event = "not_active"
+                self.effort = max_tuple[2]
+                self.newFirm.new_employeeList.append(self)
         else:
-            self.active = False
-            max_tuple = self.current_firm_maximization()
-            self.newFirm = self.currentFirm
-            self.job_event = "not_active"
-            self.effort = max_tuple[2]
-            self.newFirm.new_employeeList.append(self)
+            if random.random() <= self.model.activate:
+                self.active = True
+                # The agent's step will go here
+
+                # safe last period's effort
+                self.oldeffort = self.effort
+
+                # maximization
+                max_tuple = self.get_max_tuple(self.get_total_max_list())
+                # print(max_tuple)
+                self.newFirm = max_tuple[0]
+                self.job_event = max_tuple[1]
+                self.effort = max_tuple[2]
+
+                # subtract last period's effort from current firm
+                self.currentFirm.minus_effort(self.oldeffort)
+
+                if self.effort >= self.endowment:
+                    print("Effort bigger than endowment")
+                    sys.exit()
+
+                # self.endowment -= self.effort
+
+                if self.job_event != "startup":
+                    self.model.current_id -= 1
+                elif self.job_event == "startup":
+                    self.model.schedule.add(self.newFirm)
+                    self.model.add_new_firm()
+                else:
+                    print("There should not be a third option")
+
+                # update Firm Agent
+                self.newFirm.employeeList.append(self)
+                self.currentFirm = self.newFirm
+                self.currentFirm.plus_effort(self.effort)
+            else:
+                self.active = False
+                max_tuple = self.current_firm_maximization()
+                self.currentFirm.minus_effort(self.effort)
+                self.newFirm = self.currentFirm
+                self.job_event = "not_active"
+                self.effort = max_tuple[2]
+                self.newFirm.employeeList.append(self)
+                self.currentFirm.plus_effort(self.effort)
 
     def advance(self):
         self.currentFirm = self.newFirm
@@ -368,9 +416,13 @@ class Firm(MyAgent):
         super().__init__(unique_id, model, "F")
 
         # Random a,b and beta for each firm, todo: rewrite hardcoded part and define them in params script
-        self.constantReturnCoef = random.uniform(0, 0.5)
-        self.increasingReturnCoef = random.uniform(3 / 4, 5 / 4)
-        self.increasingReturnExp = random.uniform(3 / 2, 2)
+        #     self.constantReturnCoef = random.uniform(0, 0.5)
+        #     self.increasingReturnCoef = random.uniform(3 / 4, 5 / 4)
+        #     self.increasingReturnExp = random.uniform(3 / 2, 2)
+        self.constantReturnCoef = self.model.a
+        self.increasingReturnCoef = self.model.b
+        self.increasingReturnExp = self.model.beta
+        # self.increasingReturnExp = 1.3
         # Store all employee's in a list
         self.employeeList = []
         self.new_employeeList = []
@@ -397,6 +449,12 @@ class Firm(MyAgent):
         if value < 0:
             raise ValueError("Total effort cannot be negative")
         self._total_effort = value
+
+    def minus_effort(self, effort):
+        self.total_effort -= effort
+
+    def plus_effort(self, effort):
+        self.total_effort += effort
 
     def get_unique_id(self) -> int:
         return self.unique_id
@@ -457,7 +515,7 @@ class Firm(MyAgent):
 class BaseModel(Model):
     """A model with N agents connected in a network"""
 
-    def __init__(self, num_agents, optimization: int, activate: float, avg_node_degree=4):
+    def __init__(self, num_agents, a, b, beta,  optimization: int, activate: float, activation_type, avg_node_degree=4):
         # Number of agents
         self.num_agents = num_agents  # equals number of nodes (each agent on one node)
         # Optimization used:
@@ -468,16 +526,30 @@ class BaseModel(Model):
         self.OPTIMIZATION = optimization
         # number of active agents per period (floating decimal, corresponds to monthly job searches)
         self.activate = activate
+        # activation type (1 = Simultaneous, 2 = Random (asynchroneous))
+        self.activation_type = activation_type
+        # Firm parameters
+        self.a = a
+        self.b = b
+        self.beta = beta
+        # worker parameter
+        # self.theta = theta
         # Set network
         prob = avg_node_degree / self.num_agents
         logging.info("create graph")
         self.G = nx.fast_gnp_random_graph(n=self.num_agents, p=prob)
         self.grid = NetworkGrid(self.G)
-        self.schedule = SimultaneousActivationByType(self)
+        if self.activation_type == 1:
+            self.schedule = SimultaneousActivationByType(self)
+        else:
+            self.schedule = RandomActivationByType(self)
+
         self.current_id = 0
         self.dead_firms = []
+        self.numb_new_firms = 0
+        self.total_firms = num_agents
+        self.numb_dead_firms = 0
         self.firm_distr = []
-        self.number_exit = 0
         logging.info("graph done")
         # self.datacollector = DataCollector(
         #     # model_reporters= {"Firm Size Distribution": self.get_firm_size_distribution()}
@@ -502,6 +574,15 @@ class BaseModel(Model):
 
         logging.info("initialization done")
 
+    def count_dead_firms(self):
+        self.numb_dead_firms = len(self.dead_firms)
+
+    def add_new_firm(self):
+        self.numb_new_firms += 1
+
+    def count_total_firms(self):
+        self.total_firms = self.total_firms - self.numb_dead_firms + self.numb_new_firms
+
     def get_firm_size_distribution(self):
         firm_sizes = [firm.get_employee_count() for firm in self.schedule.agents_by_type[Firm].values()]
         x = sorted(firm_sizes)
@@ -514,11 +595,37 @@ class BaseModel(Model):
         # self.datacollector.collect(self)
         self.schedule.step(shuffle_types=False, shuffle_agents=False)
 
+        self.count_dead_firms()
+        self.count_total_firms()
         for x in self.dead_firms:
             self.schedule.remove(x)
 
-        self.dead_firms = []
+    def reset_stats(self):
 
+        self.dead_firms = []
+        self.numb_dead_firms = 0
+        self.numb_new_firms = 0
+
+    @staticmethod
+    def getResultsHeader(*args):
+        converted_list = [str(arg) for arg in args]
+        joined_string = ",".join(converted_list)
+        return joined_string
+
+    # @staticmethod
+    # def getResultsHeader(attribute):
+    #     return ['"' + attribute + '"']
+
+    def getStepResults(self, attribute_tuple):
+        a_list = []
+        for arg in attribute_tuple:
+            x = getattr(self, arg)
+            if type(x) != str:
+                a_list.append(round(getattr(self, arg), 3))
+            else:
+                a_list.append(getattr(self, arg))
+
+        return a_list
 
 # Helper functions
 
