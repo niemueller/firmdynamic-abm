@@ -1,6 +1,6 @@
 from tqdm import tqdm
 
-from src.base_model_grid import BaseModel
+from src.base_model_async import BaseModel
 # import vis_test
 import logging
 import random
@@ -22,14 +22,14 @@ logging.basicConfig(level=logging.INFO)
 
 # config = load_config("config.yaml")
 # define seed for whole run
-random.seed(1112)
+random.seed(10)
 """
 Run BaseModel x times
 Write output in results folder
 """
 
 # Meta Data
-run_id = 200
+run_id = 1000
 out_dir = "../results/axtell_99"
 # Firm Parameters
 CONSTANT_RETURNS_COEF_A = 1
@@ -38,16 +38,22 @@ INCREASING_RETURNS_EXP_BETA = 2
 # Worker Parameters
 # DIST_PREFERENCES_THETA = random.uniform(0, 1)
 # Model Parameters
-number_of_steps = 1000
-number_of_agents = 100
+number_of_steps = 10000
+number_of_agents = 1000
 number_of_active_agents = 1
 # activation type 1 = simultaneous, 2 = asynchroneous (random)
 ACTIVATION_TYPE = 2
 
+# optimization type
+optimization = (1, 2)
+
+# Average node degree (number of neighbors)
+AVERAGE_NODE_DEGREE = 2
+
 attribute_worker_tuple = ("effort", "wealth", "income", "job_event", "tenure", "preference")
 attribute_firm_tuple = ("age", "number_employees", "total_effort", "output", "average_pref")
 attributes_model_tuple = ("total_firms", "numb_new_firms", "numb_dead_firms")
-optimization = (1, 2)
+
 # Create Model with (n) agents
 if type(optimization) == int:
     model = BaseModel(number_of_agents,
@@ -56,7 +62,8 @@ if type(optimization) == int:
                       INCREASING_RETURNS_EXP_BETA,
                       optimization,
                       number_of_active_agents,
-                      ACTIVATION_TYPE)
+                      ACTIVATION_TYPE,
+                      AVERAGE_NODE_DEGREE)
 
     agent_reporter = Reporter("agent",
                               run_id,
@@ -80,9 +87,10 @@ else:
                           CONSTANT_RETURNS_COEF_A,
                           INCREASING_RETURNS_COEF_B,
                           INCREASING_RETURNS_EXP_BETA,
-                          optimization,
+                          x,
                           number_of_active_agents,
-                          ACTIVATION_TYPE)
+                          ACTIVATION_TYPE,
+                          AVERAGE_NODE_DEGREE)
 
         agent_reporter = Reporter("agent",
                                   run_id,
