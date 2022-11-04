@@ -1,6 +1,6 @@
 from tqdm import tqdm
 
-from src.base_model_async2 import BaseModel
+from src.base_model_async_random import BaseModel
 # import vis_test
 import logging
 import random
@@ -29,7 +29,7 @@ Write output in results folder
 """
 
 # Meta Data
-run_id = 312
+run_id = 313
 out_dir = "../results/axtell_99"
 # Firm Parameters
 CONSTANT_RETURNS_COEF_A = 1
@@ -40,9 +40,9 @@ INCREASING_RETURNS_EXP_BETA = 2
 # Model Parameters
 number_of_steps = 10000
 number_of_agents = 1000
-number_of_active_agents = 0.1
+number_of_active_agents = 1
 # activation type 1 = simultaneous, 2 = asynchroneous (random)
-ACTIVATION_TYPE = 2
+ACTIVATION_TYPE = 3
 
 # optimization type
 optimization = 1

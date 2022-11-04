@@ -113,7 +113,6 @@ class Worker(MyAgent):
     def mitternacht(self, c):
         x1 = (-1 + (1 + 4 * c) ** (1 / 2)) / 2
         x2 = (-1 - (1 + 4 * c) ** (1 / 2)) / 2
-        print(x1, x2)
         return x1, x2
 
     def e_singleton(self, firm):
@@ -147,18 +146,17 @@ class Worker(MyAgent):
         return employee_plus_one
 
     def get_fixed_param_tuple_new(self) -> tuple:
-        new = self.newFirm
-        if new != self.currentFirm:
-            effort_others = self.get_effort_direct(new)
+        if self.newFirm != self.currentFirm:
+            effort_others = self.get_effort_direct(self.newFirm)
         else:
-            effort_others = self.get_effort_direct(new) - self.oldeffort
+            effort_others = self.get_effort_direct(self.newFirm) - self.oldeffort
 
-        a = new.constantReturnCoef
-        b = new.increasingReturnCoef
-        beta = new.increasingReturnExp
+        a = self.newFirm.constantReturnCoef
+        b = self.newFirm.increasingReturnCoef
+        beta = self.newFirm.increasingReturnExp
         theta = self.preference
         endowment = self.endowment
-        number_employees = new.number_employees
+        number_employees = self.newFirm.number_employees
         if effort_others < 0:
             raise ValueError("Effort others negative")
         param_tuple = (a, b, beta, theta, endowment, effort_others, number_employees)
@@ -174,13 +172,13 @@ class Worker(MyAgent):
         if firm != self.currentFirm:
             effort_others = self.get_effort_direct(firm)
 
-        elif firm == self.currentFirm:
+        elif firm.unique_id == self.currentFirm.unique_id:
             effort_others = self.get_effort_direct(firm) - self.oldeffort
 
-        if firm != self.newFirm:
+        if firm.unique_id != self.newFirm.unique_id:
             number_employees = self.get_employee_count_plusone(firm)
 
-        elif firm == self.newFirm:
+        elif firm.unique_id == self.newFirm.unique_id:
             number_employees = firm.number_employees
         if effort_others < 0:
             raise ValueError("Effort others negative")
@@ -311,7 +309,6 @@ class Worker(MyAgent):
         elif self.job_event == "startup":
             self.model.schedule.add(self.newFirm)
             self.model.add_new_firm()
-        print(self.unique_id, self.job_event, self.effort)
         if self.effort >= self.endowment:
             print("Effort bigger than endowment")
             sys.exit()

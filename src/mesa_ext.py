@@ -2,6 +2,7 @@ from mesa import Agent
 from mesa.time import RandomActivationByType
 from typing import Dict, Iterator, List, Type, Union, Iterable
 import random
+import numpy as np
 
 class SimultaneousActivationByType(RandomActivationByType):
     '''
@@ -54,7 +55,13 @@ class PoissonActiveByType(RandomActivationByType):
 
         # asynchroneous activation of N agents
         worker_keys: Iterable[int] = self.agents_by_type[worker].keys()
-        activated_workers = random.choices(list(worker_keys), k=len(list(worker_keys)))
+
+        # Using poisson() method
+        numb_agents = len(worker_keys)
+        poisson_dist = np.random.poisson(1, numb_agents)
+        activated_workers = random.choices(list(worker_keys), weights=poisson_dist, k=numb_agents)
+
+        print(activated_workers)
         for active in activated_workers:
             self.agents_by_type[worker][active].move()
         # step for workers
