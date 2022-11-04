@@ -1,6 +1,7 @@
 from mesa import Agent
 from mesa.time import RandomActivationByType
-from typing import Dict, Iterator, List, Type, Union
+from typing import Dict, Iterator, List, Type, Union, Iterable
+import random
 
 class SimultaneousActivationByType(RandomActivationByType):
     '''
@@ -34,3 +35,47 @@ class SimultaneousActivationByType(RandomActivationByType):
         # #agent_keys: List[int] = list(self.agents_by_type[type_class].keys())
         # for agent_key in agent_keys:
         #     self.agents_by_type[type_class][agent_key].advance()
+
+class PoissonActiveByType(RandomActivationByType):
+
+    def step(self, shuffle_types: bool = True, shuffle_agents: bool = True) -> None:
+        """
+        Executes the step of each agent type, one at a time, in random order.
+
+        Args:
+            shuffle_types: If True, the order of execution of each types is
+                           shuffled.
+            shuffle_agents: If True, the order of execution of each agents in a
+                            type group is shuffled.
+        """
+        type_keys = list(self.agents_by_type.keys())
+        worker = type_keys[0]
+        firm = type_keys[1]
+
+        # asynchroneous activation of N agents
+        worker_keys: Iterable[int] = self.agents_by_type[worker].keys()
+        activated_workers = random.choices(list(worker_keys), k=len(list(worker_keys)))
+        for active in activated_workers:
+            self.agents_by_type[worker][active].move()
+        # step for workers
+        self.step_type(worker, shuffle_agents=shuffle_agents)
+        # step for all firms
+        self.step_type(firm, shuffle_agents=shuffle_agents)
+
+        self.steps += 1
+        self.time += 1
+
+    def step_type(self, type_class: type[Agent], shuffle_agents: bool = True) -> None:
+        """
+        Shuffle order and run all agents of a given type.
+        This method is equivalent to the NetLogo 'ask [breed]...'.
+
+        Args:
+            type_class: Class object of the type to run.
+        """
+        agent_keys: Iterable[int] = self.agents_by_type[type_class].keys()
+        if shuffle_agents:
+            agent_keys = list(agent_keys)
+            self.model.random.shuffle(agent_keys)
+        for agent_key in agent_keys:
+            self.agents_by_type[type_class][agent_key].step()

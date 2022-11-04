@@ -122,6 +122,16 @@ class Worker(MyAgent):
     #     df = pd.DataFrame(columns=col_names)
     #     return df
 
+    def mitternacht(self, c):
+        x1, = (-1+(1-4*c)**(1/2))/2
+        x2 = (-1-(1-4*c)**(1/2))/2
+        return x1, x2
+
+    def get_effort_from_output(self, firm):
+        o = firm.total_effort
+        e1, e2 = self.mitternacht(o)
+        effort = max(e1, e2)
+        return effort
 
     def get_effort_others_current_firm(self) -> float:
         firm = self.currentFirm
@@ -313,10 +323,11 @@ class Worker(MyAgent):
         current_max_tuple = self.current_firm_maximization()
         # check if join_other_max_list is empty
         if join_other_max_list:
-            all_max_list = join_other_max_list
-            all_max_list.append(current_max_tuple)
+            random.shuffle(join_other_max_list)
+            all_max_list = [current_max_tuple]
+            for item in join_other_max_list:
+                all_max_list.append(item)
             all_max_list.append(startup_max_tuple)
-
         else:
             all_max_list = [current_max_tuple, startup_max_tuple]
         return all_max_list
@@ -348,11 +359,11 @@ class Worker(MyAgent):
             # self.currentFirm.minus_effort(self.oldeffort)
             self.currentFirm.minus_employee()
             self.currentFirm.remove_employee_list(self)
-            self.currentFirm.calc_total_effort()
+            # self.currentFirm.calc_total_effort()
 
             # add agents attributes to new firm
             self.newFirm.add_employee_list(self)
-            self.newFirm.calc_total_effort()
+            # self.newFirm.calc_total_effort()
 
             # self.newFirm.add_employee_list(self)
 
@@ -363,15 +374,19 @@ class Worker(MyAgent):
             if self.job_event == "stay":
                 self.model.current_id -= 1
                 self.newFirm.plus_employee()
+                self.increase_tenure()
 
             elif self.job_event == "startup":
                 self.model.schedule.add(self.newFirm)
+                self.newFirm.calc_total_effort()
                 self.model.add_new_firm()
+                self.reset_tenure()
 
             elif self.job_event == "join_other":
                 # add to new firm (not needed for startup as founder already in employee count)
                 self.model.current_id -= 1
                 self.newFirm.plus_employee()
+                self.reset_tenure()
 
             else:
                 print("There should not be a 4th option")
@@ -381,21 +396,22 @@ class Worker(MyAgent):
 
         else:
             self.active = False
-
-            # safe last period's effort
-            self.oldeffort = self.effort
-            self.currentFirm = self.newFirm
-
-            # maximization
-            max_tuple = self.current_firm_maximization()
-            self.newFirm = self.currentFirm
-            self.job_event = "not_active"
-            self.effort = max_tuple[2]
+            self.tenure += 1
+                # some agents not active
+            # # safe last period's effort
+            # self.oldeffort = self.effort
+            # self.currentFirm = self.newFirm
+            #
+            # # maximization
+            # max_tuple = self.current_firm_maximization()
+            # self.newFirm = self.currentFirm
+            # self.job_event = "not_active"
+            # self.effort = max_tuple[2]
 
             # subtract last period's effort from current firm
             # self.currentFirm.plus_effort(self.effort)
             # self.currentFirm.minus_effort(self.oldeffort)
-            self.currentFirm.calc_total_effort()
+            # self.currentFirm.calc_total_effort()
 
 
     def advance(self):
@@ -489,7 +505,7 @@ class Firm(MyAgent):
 
     def step(self):
         self.age += 1
-        # self.employeeList = self.new_employeeList
+        self.calc_total_effort()
         logging.debug(f"Age:{self.age}\tNumEmployees: {self.number_employees}")
         if self.employeeList:
             self.update_output()
@@ -531,9 +547,9 @@ class BaseModel(Model):
         # Erdos Renyi Random Graph
         # self.G = nx.fast_gnp_random_graph(n=self.num_agents, p=prob)
         # Regular Graph with avg_node_degree = # of neighbors
-        self.G = nx.random_regular_graph(avg_node_degree, num_agents)
+        # self.G = nx.random_regular_graph(avg_node_degree, num_agents)
         # Cycle Graph with every agent having 2 neighbors
-        # self.G = nx.cycle_graph(num_agents)
+        self.G = nx.cycle_graph(num_agents)
         self.grid = NetworkGrid(self.G)
         if self.activation_type == 1:
             self.schedule = SimultaneousActivationByType(self)

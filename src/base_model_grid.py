@@ -22,9 +22,18 @@ def firm_output(a, b, beta, total_effort):
     return a * total_effort + b * total_effort ** beta
 
 
+def utility_func(effort, a, b, beta, theta, endowment, effort_others, number_employees):
+    return ((a * (effort + effort_others) + b * (effort + effort_others) ** beta) / number_employees) ** theta * (
+            endowment - effort) ** (1 - theta)
+
+
 def utility(effort, a, b, beta, theta, endowment, effort_others, number_employees):
     return (-(((a * (effort + effort_others) + b * (effort + effort_others) ** beta) / number_employees) ** theta * (
             endowment - effort) ** (1 - theta)))
+
+
+def e_star(a, b, theta, endowment, effort_others):
+    return max(0, (-a-2*b*(effort_others-theta)+(a**2+4*a*b*theta**2*(endowment+effort_others)+4*b**2*theta**2*(1+effort_others)**2)**(1/2))/(2*b*(1+theta)))
 
 
 def log_utility(effort, a, b, beta, theta, endowment, effort_others, number_employees):
@@ -73,8 +82,8 @@ class Worker(MyAgent):
         self.endowment = 1
         self.preference = random.uniform(0, 1)
         # create open-open interval (random.uniform is [,))
-        while self.preference == 0.0:
-            self.preference = random.uniform(0, 1)
+        if self.preference == 0.0:
+            self.preference = sys.epsilon
         # Add current firm variable
         self.currentFirm = None
         self.newFirm = None
@@ -170,22 +179,27 @@ class Worker(MyAgent):
         return param_tuple
 
     def utility_max_object(self, params: tuple):
-        effort_others = params[5]
-        endowment = params[4]
-        epsilon = sys.float_info.epsilon
-        # if all others
-        if effort_others == 0:
-            bnds = (epsilon, endowment - epsilon)
-        else:
-            bnds = (0, endowment - epsilon)
 
-        optimization_output = opt.minimize_scalar(log_utility, args=params, method="bounded", bounds=bnds)
-        if not optimization_output.success:
-            raise ValueError("Optimization not successful")
+        if self.model.beta == 2:
+            effort_star = e_star(params[0], params[1], params[3], 1, params[5])
+            utility_star = utility_func(effort_star, *params)
         else:
-            effort_star = optimization_output.x
-            utility_star = -optimization_output.fun
-            return effort_star, utility_star
+            effort_others = params[5]
+            endowment = params[4]
+            epsilon = sys.float_info.epsilon
+            # if all others
+            if effort_others == 0:
+                bnds = (epsilon, endowment - epsilon)
+            else:
+                bnds = (0, endowment - epsilon)
+
+            optimization_output = opt.minimize_scalar(log_utility, args=params, method="bounded", bounds=bnds)
+            if not optimization_output.success:
+                raise ValueError("Optimization not successful")
+            else:
+                effort_star = optimization_output.x
+                utility_star = -optimization_output.fun
+        return effort_star, utility_star
 
     def utility_max_object_grid(self, gridsize: int, params: tuple):
         effort_others = params[5]
@@ -304,10 +318,11 @@ class Worker(MyAgent):
         # check if join_other_max_list is empty
         if join_other_max_list:
             all_max_list = join_other_max_list
-            all_max_list.append(startup_max_tuple)
             all_max_list.append(current_max_tuple)
+            all_max_list.append(startup_max_tuple)
+
         else:
-            all_max_list = [startup_max_tuple, current_max_tuple]
+            all_max_list = [current_max_tuple, startup_max_tuple]
         return all_max_list
 
     def get_max_tuple(self, list_of_tuples) -> tuple:
@@ -515,7 +530,7 @@ class Firm(MyAgent):
 class BaseModel(Model):
     """A model with N agents connected in a network"""
 
-    def __init__(self, num_agents, a, b, beta,  optimization: int, activate: float, activation_type, avg_node_degree=4):
+    def __init__(self, num_agents, a, b, beta,  optimization: int, activate: float, activation_type, avg_node_degree):
         # Number of agents
         self.num_agents = num_agents  # equals number of nodes (each agent on one node)
         # Optimization used:
@@ -537,7 +552,12 @@ class BaseModel(Model):
         # Set network
         prob = avg_node_degree / self.num_agents
         logging.info("create graph")
-        self.G = nx.fast_gnp_random_graph(n=self.num_agents, p=prob)
+        # Erdos Renyi Random Graph
+        # self.G = nx.fast_gnp_random_graph(n=self.num_agents, p=prob)
+        # Regular Graph with avg_node_degree = # of neighbors
+        # self.G = nx.random_regular_graph(avg_node_degree, num_agents)
+        # Cycle Graph with every agent having 2 neighbors
+        self.G = nx.cycle_graph(num_agents)
         self.grid = NetworkGrid(self.G)
         if self.activation_type == 1:
             self.schedule = SimultaneousActivationByType(self)
