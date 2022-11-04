@@ -67,10 +67,10 @@ class Worker(MyAgent):
         super().__init__(unique_id, model, "W")
         self.model = model
         self.endowment = 1
-        self.preference = random.uniform(0, 1 + sys.float_info.epsilon)
+        self.preference = random.uniform(0, 1)
         # create open-open interval (random.uniform is [,))
-        # if self.preference == 0.0:
-        #   self.preference = sys.epsilon
+        if self.preference == 0.0:
+            self.preference = sys.epsilon
         # Add current firm variable
         self.currentFirm = None
         self.newFirm = None
@@ -146,18 +146,18 @@ class Worker(MyAgent):
         return employee_plus_one
 
     def get_fixed_param_tuple_new(self) -> tuple:
-
         if self.newFirm.unique_id != self.currentFirm.unique_id:
             effort_others = self.get_effort_direct(self.newFirm)
+            number_employees = self.newFirm.number_employees + 1
         else:
             effort_others = self.get_effort_direct(self.newFirm) - self.oldeffort
+            number_employees = self.newFirm.number_employees
 
         a = self.newFirm.constantReturnCoef
         b = self.newFirm.increasingReturnCoef
         beta = self.newFirm.increasingReturnExp
         theta = self.preference
         endowment = self.endowment
-        number_employees = self.newFirm.number_employees
         if effort_others < 0:
             raise ValueError("Effort others negative")
         param_tuple = (a, b, beta, theta, endowment, effort_others, number_employees)
@@ -176,10 +176,10 @@ class Worker(MyAgent):
         elif firm.unique_id == self.currentFirm.unique_id:
             effort_others = self.get_effort_direct(firm) - self.oldeffort
 
-        if firm.unique_id != self.newFirm.unique_id:
+        if firm.unique_id != self.currentFirm.unique_id:
             number_employees = self.get_employee_count_plusone(firm)
 
-        elif firm.unique_id == self.newFirm.unique_id:
+        elif firm.unique_id == self.currentFirm.unique_id:
             number_employees = firm.number_employees
         if effort_others < 0:
             raise ValueError("Effort others negative")
@@ -212,7 +212,7 @@ class Worker(MyAgent):
         firm_network = []
         neighbor_nodes = self.get_neighbors()
         for agent in self.model.grid.get_cell_list_contents(neighbor_nodes):
-            if agent.newFirm != self.currentFirm:
+            if agent.newFirm.unique_id != self.currentFirm.unique_id:
                 firm_network.append(agent.newFirm)
         res = []
         [res.append(x) for x in firm_network if x not in res]
@@ -248,7 +248,7 @@ class Worker(MyAgent):
 
     def create_startup(self):
         startup = Firm(self.model.next_id(), self.model)
-        startup.number_employees = 0
+        startup.number_employees = 1
         return startup
 
     def startup_maximization(self):
@@ -296,11 +296,9 @@ class Worker(MyAgent):
             # move
             self.reset_tenure()
             self.newFirm.remove_employee_list(self)
-            self.newFirm.minus_employee()
             # set new firm
             self.newFirm = max_tuple[0]
             self.newFirm.add_employee_list(self)
-            self.newFirm.plus_employee()
 
         self.job_event = max_tuple[1]
         self.effort = max_tuple[2]
@@ -371,6 +369,9 @@ class Firm(MyAgent):
     def plus_employee(self):
         self.number_employees += 1
 
+    def employee_count(self):
+        self.number_employees = len(self.employeeList)
+
     def add_employee_list(self, worker):
         self.employeeList.append(worker)
 
@@ -397,6 +398,7 @@ class Firm(MyAgent):
 
     def step(self):
         self.age += 1
+        self.employee_count()
         self.calc_total_effort()
         logging.debug(f"Age:{self.age}\tNumEmployees: {self.number_employees}")
         if self.employeeList:
@@ -467,7 +469,7 @@ class BaseModel(Model):
             worker.effort = worker.e_singleton(firm)
             # Add current employee to firms employee list (initial condition len != 1 for all firms)
             firm.employeeList.append(worker)
-            firm.total_effort = worker.effort
+            firm.total_effort = worker.e_singleton(firm)
             firm.update_output()
             self.schedule.add(worker)
             self.schedule.add(firm)
