@@ -413,7 +413,6 @@ class Worker(MyAgent):
             # self.currentFirm.minus_effort(self.oldeffort)
             # self.currentFirm.calc_total_effort()
 
-
     def advance(self):
         self.currentFirm = self.newFirm
         if self.job_event == "stay" or self.job_event == "not_active":

@@ -148,7 +148,10 @@ class Worker(MyAgent):
 
     def get_fixed_param_tuple_new(self) -> tuple:
         new = self.newFirm
-        effort_others = self.get_effort_from_output(new) - self.effort
+        if new != self.currentFirm:
+            effort_others = self.get_effort_direct(new)
+        else:
+            effort_others = self.get_effort_direct(new) - self.oldeffort
 
         a = new.constantReturnCoef
         b = new.increasingReturnCoef
@@ -172,7 +175,7 @@ class Worker(MyAgent):
             effort_others = self.get_effort_direct(firm)
 
         elif firm == self.currentFirm:
-            effort_others = self.get_effort_from_output(firm) - self.effort
+            effort_others = self.get_effort_direct(firm) - self.oldeffort
 
         if firm != self.newFirm:
             number_employees = self.get_employee_count_plusone(firm)
@@ -273,7 +276,6 @@ class Worker(MyAgent):
             all_max_list.append(startup_max_tuple)
         else:
             all_max_list = [current_max_tuple, startup_max_tuple]
-        print(all_max_list)
         return all_max_list
 
     def get_max_tuple(self, list_of_tuples) -> tuple:
@@ -291,7 +293,6 @@ class Worker(MyAgent):
 
         # maximization
         max_tuple = self.get_max_tuple(self.get_total_max_list())
-        print(max_tuple)
         if self.newFirm != max_tuple[0]:
             # move
             self.reset_tenure()
@@ -301,7 +302,6 @@ class Worker(MyAgent):
             self.newFirm = max_tuple[0]
             self.newFirm.add_employee_list(self)
             self.newFirm.plus_employee()
-            self.newFirm.update_output()
 
         self.job_event = max_tuple[1]
         self.effort = max_tuple[2]
