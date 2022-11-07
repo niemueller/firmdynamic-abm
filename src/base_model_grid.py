@@ -553,11 +553,11 @@ class BaseModel(Model):
         prob = avg_node_degree / self.num_agents
         logging.info("create graph")
         # Erdos Renyi Random Graph
-        # self.G = nx.fast_gnp_random_graph(n=self.num_agents, p=prob)
+        self.G = nx.fast_gnp_random_graph(n=self.num_agents, p=prob)
         # Regular Graph with avg_node_degree = # of neighbors
         # self.G = nx.random_regular_graph(avg_node_degree, num_agents)
         # Cycle Graph with every agent having 2 neighbors
-        self.G = nx.cycle_graph(num_agents)
+        # self.G = nx.cycle_graph(num_agents)
         self.grid = NetworkGrid(self.G)
         if self.activation_type == 1:
             self.schedule = SimultaneousActivationByType(self)

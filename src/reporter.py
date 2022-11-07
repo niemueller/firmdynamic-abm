@@ -1,6 +1,5 @@
 import gzip
-
-from src.base_model import BaseModel, Worker, Firm
+from src.base_model_grid import BaseModel
 
 
 class Reporter:

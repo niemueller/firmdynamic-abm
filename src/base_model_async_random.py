@@ -1,15 +1,11 @@
 import logging
 import random
 
-import pandas as pd
-import scipy.optimize as opt
 import networkx as nx
 from mesa import Agent, Model
 from mesa.time import RandomActivationByType
 from mesa.space import NetworkGrid
-from mesa.datacollection import DataCollector
 import numpy as np
-import math
 import sys
 from operator import itemgetter
 
@@ -82,13 +78,6 @@ class Worker(MyAgent):
         self.income = None
         self.tenure = 0
         self.current_List = []
-
-        # @staticmethod
-        # def getResultsHeader(attribute):
-        #     return ['"'+attribute+'"']
-
-    # def getStepResults(self):
-    #     return [str(self.wealth)]
 
     @property
     def endowment(self):
@@ -212,7 +201,7 @@ class Worker(MyAgent):
         firm_network = []
         neighbor_nodes = self.get_neighbors()
         for agent in self.model.grid.get_cell_list_contents(neighbor_nodes):
-            if agent.newFirm != self.currentFirm:
+            if agent.newFirm != self.newFirm:
                 firm_network.append(agent.newFirm)
         res = []
         [res.append(x) for x in firm_network if x not in res]
@@ -305,9 +294,7 @@ class Worker(MyAgent):
         self.job_event = max_tuple[1]
         self.effort = max_tuple[2]
 
-        if self.job_event != "startup":
-            self.model.current_id -= 1
-        elif self.job_event == "startup":
+        if self.job_event == "startup":
             self.model.schedule.add(self.newFirm)
             self.model.add_new_firm()
         if self.effort >= self.endowment:
@@ -318,6 +305,7 @@ class Worker(MyAgent):
         self.increase_tenure()
         self.oldeffort = self.effort
         self.currentFirm = self.newFirm
+
 
 class Firm(MyAgent):
     """Heterogeneous Firms in the model with random production function coefficients"""
@@ -341,13 +329,6 @@ class Firm(MyAgent):
         self.output = 0
         self.number_employees = 1
         self.average_pref = None
-
-    # @staticmethod
-    # def getResultsHeader(attribute):
-    #     return ['"' + attribute + '"']
-
-    # def getStepResults(self):
-    #     return [str(self.output)]
 
     @property
     def total_effort(self):
@@ -439,9 +420,9 @@ class BaseModel(Model):
         # Erdos Renyi Random Graph
         # self.G = nx.fast_gnp_random_graph(n=self.num_agents, p=prob)
         # Regular Graph with avg_node_degree = # of neighbors
-        # self.G = nx.random_regular_graph(avg_node_degree, num_agents)
+        self.G = nx.random_regular_graph(avg_node_degree, num_agents)
         # Cycle Graph with every agent having 2 neighbors
-        self.G = nx.cycle_graph(num_agents)
+        # self.G = nx.cycle_graph(num_agents)
         self.grid = NetworkGrid(self.G)
         if self.activation_type == 1:
             self.schedule = SimultaneousActivationByType(self)
@@ -506,9 +487,6 @@ class BaseModel(Model):
         joined_string = ",".join(converted_list)
         return joined_string
 
-    # @staticmethod
-    # def getResultsHeader(attribute):
-    #     return ['"' + attribute + '"']
 
     def getStepResults(self, attribute_tuple):
         a_list = []
